@@ -44,7 +44,9 @@
 .eqv RED 0xed1c24
 .eqv LIGHT_BLUE 0x7092be
 .eqv BLACK 0x000000
+.eqv FRAME 40
 
+.include "bitmap_buffer.inc"
 .include "menu.inc"
 .include "menuarrow.inc"
 
@@ -58,7 +60,7 @@ LEVEL:		.word 0
 CH_Location:	.word 0:2
 E_Count:	.word 0
 
-
+debug_space:	.asciiz " "
 
 
 .text
@@ -71,14 +73,52 @@ START:
 	
 	# Run Menu Loop
 MENULOOP2:
-	
 	# Check Player input
+	li $t9, 0xffff0000
+	lw $t8, 0($t9)
+	li $t1, 1
+	bne $t8, $t1, MENUNOKEY
 	
 	# Call MenuArrow if needed
+	li $t1, 119 # w key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, MENU_NO_W # If w is pressed
+	addi $t7, $t7, 1
+	andi $t7, $t7, 1
+	jal MenuArrow
+MENU_NO_W:
+	li $t1, 115 # s key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, MENU_NO_S # If s is pressed
+	addi $t7, $t7, 1
+	andi $t7, $t7, 1
+	jal MenuArrow
 	
 	# Break loop if needed
+MENU_NO_S:
+	li $t1, 122 # z key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, MENU_NO_Z # If z is pressed
+	bnez $t7, MENUQUIT # Arrow is on quit button
+	j MENULOOPEND
+MENUQUIT:
+	j END
 	
-	# j MENULOOP2
+	# P to restart
+MENU_NO_Z:
+	li $t1, 112 # p key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, MENUNOKEY # If p is pressed
+	jal ClearScreen
+	j START
+	
+	# No key press
+MENUNOKEY:
+	# Sleep
+	li $v0, 32
+	li $a0, FRAME
+	syscall
+	j MENULOOP2
 MENULOOPEND:
 	
 	# Initialize Game
@@ -90,20 +130,20 @@ MENULOOPEND:
 	
 	
 END:
+	jal ClearScreen
 	li $v0, 10 # terminate the program gracefully
 	syscall
 	
 # Functions
 # Initializes bitmap display to menu
 InitializeMenu:
-	li $t0, BASE_ADDRESS # $t0 stores the base address for display
-	move $t4, $t0
+	li $t4, BASE_ADDRESS # $t0 stores the base address for display
 	addi $t5, $t4, 262144
 	la $t6, menu_scr
 MENULOOP1:
 	beq $t4, $t5, MENUDONE
-	lw $t7, 0($t6)
-	sw $t7, 0($t4)
+	lw $t2, 0($t6)
+	sw $t2, 0($t4)
 	addi $t4, $t4, 4
 	addi $t6, $t6, 4
 	j MENULOOP1
@@ -187,3 +227,16 @@ Win:
 
 # Draw lose screen
 Lose:
+
+# Clear Screen
+ClearScreen:
+	li $t0, BASE_ADDRESS # $t0 stores the base address for display
+	addi $t5, $t0, 262144
+	li $t6, BLACK
+CLEARLOOP:
+	beq $t0, $t5, CLEARDONE
+	sw $t6, 0($t0)
+	addi $t0, $t0, 4
+	j CLEARLOOP
+CLEARDONE:
+	jr $ra
