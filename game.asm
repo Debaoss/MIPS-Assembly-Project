@@ -36,10 +36,12 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
-.eqv CH_HEIGHT 0
-.eqv CH_WIDTH 0
+.eqv CH_HEIGHT 27
+.eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 0
 .eqv ENM_WIDTH 0
+.eqv GOAL_HEIGHT 22
+.eqv GOAL_WIDTH 16
 .eqv DARK_BLUE 0x3f48cc
 .eqv RED 0xed1c24
 .eqv LIGHT_BLUE 0x7092be
@@ -49,16 +51,33 @@
 .include "bitmap_buffer.inc"
 .include "menu.inc"
 .include "menuarrow.inc"
+.include "background1.inc"
+.include "Ch_Right.inc"
+.include "Ch_Left.inc"
+.include "Door.inc"
 
 .data
-CH_COLOUR:	.word 0
-F_Bullet:	.word 0:2
+F_Bullet:	.word 0:3
 F_Shot_Timer:	.word 0
-E_Bullet:	.word 0:16
-E_Location:	.word 0:16
-LEVEL:		.word 0
+E_Bullet:	.word 0:24
+E_Location:	.word 0:24
+E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
-E_Count:	.word 0
+Goal_Location:	.word 0:2
+LEVEL:		.byte 0
+E_Count:	.byte 0
+Health:		.byte 0
+Grounded:	.byte 0
+Character:	.byte 0
+
+Level_Back:	.word 0:5
+Level_Coll:	.word 0:5
+LevelCollCount:	.word 0:5
+LevelEnemy:	.word 0:5
+Characters:	.word 0:4
+
+
+
 
 debug_space:	.asciiz " "
 
@@ -66,6 +85,16 @@ debug_space:	.asciiz " "
 .text
 .globl main
 main:
+	la $t3, background1
+	la $t4, Level_Back
+	sw $t3, 0($t4)
+	
+	la $t3, CH_Right
+	la $t4, Characters
+	sw $t3, 0($t4)
+	la $t3, CH_Left
+	addi $t4, $t4, 4
+	sw $t3, 0($t4)
 	
 START:
 	# Initialize menu
@@ -122,10 +151,42 @@ MENUNOKEY:
 MENULOOPEND:
 	
 	# Initialize Game
+	jal InitializeLevel
 	
 	# Run Game Loop
+LEVELLOOP:
+	
+	# Check inputs
+	li $t9, 0xffff0000
+	lw $t8, 0($t9)
+	li $t1, 1
+	
+	# Move character
+	
+	# Player shoot
+	
+	# P to restart
+	li $t1, 112 # p key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LEVELNOKEY # If p is pressed
+	jal ClearScreen
+	li $t3, 0
+	sw $t3, LEVEL
+	sw $t3, Character
+	j START
+	
+LEVELNOKEY:
+	# Enemies shoot
+	
+	# Move bullets
+	
+	# Check Collision
 	
 	
+	# Debug code
+	li $v0, 32
+	li $a0, 25000
+	syscall
 	
 	
 	
@@ -206,12 +267,99 @@ ARROWERASED:
 
 # Initializes bitmap display for game
 InitializeLevel:
+	li $t4, BASE_ADDRESS # $t0 stores the base address for display
+	addi $t5, $t4, 262144
+	lw $t1, LEVEL
+	la $t2, Level_Back
+	sll $t1, $t1, 2
+	add $t2, $t2, $t1
+	lw $t3, 0($t2)
+LEVELLOOP1:
+	beq $t4, $t5, LEVELDONE
+	lw $t2, 0($t3)
+	sw $t2, 0($t4)
+	addi $t4, $t4, 4
+	addi $t3, $t3, 4
+	j LEVELLOOP1
+LEVELDONE:
+	# Set character at 0, 170
+	la $t6, CH_Location
+	li $t5, 0
+	sw $t5, 0($t6)
+	li $t5, 170
+	sw $t5, 4($t6)
+	lw $t5, Character
+	# Make Character face right
+	srl $t5, $t5, 1
+	sll $t5, $t5, 1
+	# Draw Character on screen
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	jal DrawCharacter
+	jal DrawDoor
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	
+	jr $ra
 
 # Draw character at given location
 DrawCharacter:
+	li $t0, BASE_ADDRESS
+	lw $t1, Character
+	la $t2, Characters
+	sll $t1, $t1, 2
+	add $t2, $t2, $t1
+	lw $t3, 0($t2)
+	move $t4, $t3
+	addi $t4, $t4, 1296
+	addi $t0, $t0, 174080 # (197 - CH_HEIGHT) * 4
+	li $t6, 0
+	li $t7, 12 # (CH_WIDTH)
+CHLOOP1:
+	beq $t3, $t4, CHDRAWN
+	lw $t5, 0($t3)
+	sw $t5, 0($t0)
+	addi $t3, $t3, 4
+	addi $t0, $t0, 4
+	addi $t6, $t6, 1
+	bne $t6, $t7, CHJUMP1
+	li $t6, 0
+	addi $t0, $t0, 976 # Next line
+CHJUMP1:
+	j CHLOOP1
+CHDRAWN:
+	jr $ra
 
-# Draw enemy at given location
+# Draw enemies at given locations
 DrawEnemy:
+
+# Draws and clears hearts
+DrawHeart:
+
+# Draws the door
+DrawDoor:
+	li $t0, BASE_ADDRESS
+	la $t1, door
+	li $t2, 0
+	li $t3, 16
+	move $t4, $t1
+	addi $t4, $t4, 1408
+	addi $t0, $t0, 3008 #936
+DOORLOOP1:
+	beq $t1, $t4, DOORDRAWN
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, DOORJUMP1
+	li $t2, 0
+	addi $t0, $t0, 960 # Next line
+DOORJUMP1:
+	j DOORLOOP1
+DOORDRAWN:
+	jr $ra
 
 # Checks collision with platforms
 CheckCollision:
