@@ -52,6 +52,7 @@
 .include "menu.inc"
 .include "menuarrow.inc"
 .include "background1.inc"
+.include "Level1Info.inc"
 .include "Ch_Right.inc"
 .include "Ch_Left.inc"
 .include "Door.inc"
@@ -64,10 +65,11 @@ E_Location:	.word 0:24
 E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
+Player_V_Speed:	.word 0
 LEVEL:		.byte 0
 E_Count:	.byte 0
 Health:		.byte 0
-Grounded:	.byte 0
+Airbourne:	.byte 0
 Character:	.byte 0
 
 Level_Back:	.word 0:5
@@ -160,8 +162,54 @@ LEVELLOOP:
 	li $t9, 0xffff0000
 	lw $t8, 0($t9)
 	li $t1, 1
+	bne $t8, $t1, LEVELNOKEY
 	
 	# Move character
+	li $t1, 100 # d key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LEVEL_NO_D # If d is pressed
+	
+	jal EraseCharacter
+	
+	la $t3, CH_Location
+	lw $t4, 0($t3)
+	addi $t4, $t4, 4
+	sw $t4, 0($t3)
+	
+	lw $t3, Character
+	srl $t3, $t3, 1
+	sll $t3, $t3, 1
+	sw $t3, Character
+	# Check for collision
+	
+	jal DrawCharacter
+	
+	j LEVELNOKEY
+LEVEL_NO_D:
+	li $t1, 97 # a key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LEVEL_NO_A # If a is pressed
+	
+	jal EraseCharacter
+	
+	la $t3, CH_Location
+	lw $t4, 0($t3)
+	addi $t4, $t4, -4
+	sw $t4, 0($t3)
+	
+	lw $t3, Character
+	srl $t3, $t3, 1
+	sll $t3, $t3, 1
+	addi $t3, $t3, 1
+	sw $t3, Character
+	# Check for collision
+	
+	jal DrawCharacter
+	
+	j LEVELNOKEY
+LEVEL_NO_A:
+	
+	
 	
 	# Player shoot
 	
@@ -176,6 +224,9 @@ LEVELLOOP:
 	j START
 	
 LEVELNOKEY:
+
+	# Check grounded, apply gravity
+	
 	# Enemies shoot
 	
 	# Move bullets
@@ -183,10 +234,12 @@ LEVELNOKEY:
 	# Check Collision
 	
 	
-	# Debug code
-	li $v0, 32
-	li $a0, 25000
-	syscall
+	
+	
+	j LEVELLOOP
+	
+	
+	
 	
 	
 	
@@ -313,7 +366,20 @@ DrawCharacter:
 	lw $t3, 0($t2)
 	move $t4, $t3
 	addi $t4, $t4, 1296
-	addi $t0, $t0, 174080 # (197 - CH_HEIGHT) * 4
+	
+	# Get Ch location
+	la $t6, CH_Location
+	lw $t5, 0($t6)
+	lw $t7, 4($t6)
+	li $t6, 256
+	mult $t6, $t7
+	mflo $t7
+	add $t7, $t7, $t5
+	li $t6, 4
+	mult $t6, $t7
+	mflo $t7
+	
+	add $t0, $t0, $t7 # add (y * 256 + x) * 4
 	li $t6, 0
 	li $t7, 12 # (CH_WIDTH)
 CHLOOP1:
@@ -329,6 +395,51 @@ CHLOOP1:
 CHJUMP1:
 	j CHLOOP1
 CHDRAWN:
+	jr $ra
+	
+# Erase character from given location
+EraseCharacter:
+	li $t0, BASE_ADDRESS
+	lw $t1, LEVEL
+	la $t2, Level_Back
+	sll $t1, $t1, 2 # times 4
+	add $t2, $t2, $t1
+	lw $t3, 0($t2)
+	move $t4, $t3
+	addi $t4, $t4, 27648 #27696
+	
+	# Get Ch location
+	la $t6, CH_Location
+	lw $t5, 0($t6)
+	lw $t7, 4($t6)
+	li $t6, 256
+	mult $t6, $t7
+	mflo $t7
+	add $t7, $t7, $t5
+	li $t6, 4
+	mult $t6, $t7
+	mflo $t7
+	
+	add $t0, $t0, $t7 # add (y * 256 + x) * 4
+	add $t4, $t4, $t7
+	add $t3, $t3, $t7
+	li $t6, 0
+	li $t7, 12 # (CH_WIDTH)
+	
+CHLOOP2:
+	beq $t3, $t4, CHERASED
+	lw $t5, 0($t3)
+	sw $t5, 0($t0)
+	addi $t3, $t3, 4
+	addi $t0, $t0, 4
+	addi $t6, $t6, 1
+	bne $t6, $t7, CHJUMP2
+	li $t6, 0
+	addi $t0, $t0, 976 # Next line
+	addi $t3, $t3, 976
+CHJUMP2:
+	j CHLOOP2
+CHERASED:
 	jr $ra
 
 # Draw enemies at given locations
