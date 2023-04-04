@@ -36,6 +36,7 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
+.eqv TOTAL_LEVELS 5
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 0
@@ -61,21 +62,20 @@
 F_Bullet:	.word 0:3
 F_Shot_Timer:	.word 0
 E_Bullet:	.word 0:24
-E_Location:	.word 0:24
 E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
 LEVEL:		.byte 0
-E_Count:	.byte 0
 Health:		.byte 0
 Airbourne:	.byte 0
 Character:	.byte 0
 
-Level_Back:	.word 0:5
-Level_Coll:	.word 0:5
-LevelCollCount:	.word 0:5
-LevelEnemy:	.word 0:5
+Level_Back:	.word 0:TOTAL_LEVELS
+Level_Coll:	.word 0:TOTAL_LEVELS
+LevelCollCount:	.word 0:TOTAL_LEVELS
+LevelEnemy:	.word 0:TOTAL_LEVELS
+LevelECount:	.word 0:TOTAL_LEVELS
 Characters:	.word 0:4
 
 
@@ -89,6 +89,22 @@ debug_space:	.asciiz " "
 main:
 	la $t3, background1
 	la $t4, Level_Back
+	sw $t3, 0($t4)
+	
+	la $t3, Level1PlatColl
+	la $t4, Level_Coll
+	sw $t3, 0($t4)
+	
+	la $t3, Level1PlatNo
+	la $t4, LevelCollCount
+	sw $t3, 0($t4)
+	
+	la $t3, Level1EnemyNo
+	la $t4, LevelECount
+	sw $t3, 0($t4)
+	
+	la $t3, Level1Enemy
+	la $t4, LevelEnemy
 	sw $t3, 0($t4)
 	
 	la $t3, CH_Right
@@ -473,7 +489,30 @@ DOORDRAWN:
 	jr $ra
 
 # Checks collision with platforms
+# Stored in a0: 0 for left side, 1 for right, 2 for top, 3 for down
+CheckAllCollision:
+
+# Stored in a1: Which platform, in a2: level data address for this level
 CheckCollision:
+
+Level_Coll:	.word 0:TOTAL_LEVELS
+LevelCollCount:	.word 0:TOTAL_LEVELS
+
+	move $t0, $a1
+	move $t1, $a0
+	li $t2, 4
+	mult $t0, $t2
+	mflo $t0
+	add $t0, $t1, $t0
+	mult $t0, $t2
+	mflo $t0
+	
+	move $t2, $a2
+	add $t2, $t2, $t0
+	lw $t3, 0($t2) # Relevent side of the platform
+	
+	
+	
 
 # Checks friendly fire on enemies
 CheckFHit:
