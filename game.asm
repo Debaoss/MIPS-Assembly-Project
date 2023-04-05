@@ -58,6 +58,7 @@
 .include "Ch_Right.inc"
 .include "Ch_Left.inc"
 .include "Door.inc"
+.include "WinScreen.inc"
 
 .data
 F_Bullet:	.word 0:3
@@ -355,8 +356,19 @@ NO_REDRAW1:
 	# Move player bullet
 	
 	# Check win condition
+	lw $t3, CH_Location
+	li $t4, 226
+	ble $t3, $t4, NOT_WIN
+	lw $t3, CH_Location + 4
+	li $t4, 31
+	bgt $t3, $t4, NOT_WIN
+	lw $t5, LEVEL
+	addi $t5, $t5, 1
+	li $t6, TOTAL_LEVELS
+	beq $t5, $t6, Win
+	j MENULOOPEND
 	
-	
+NOT_WIN:
 	
 	# Sleep
 	li $v0, 32
@@ -770,6 +782,42 @@ CheckEHit:
 
 # Draw win screen
 Win:
+	li $t0, BASE_ADDRESS # $t0 stores the base address for display
+	addi $t5, $t0, 262144
+	la $t1, WinScreen
+WINLOOP1:
+	beq $t0, $t5, WINLOOP2
+	lw $t6, 0($t1)
+	sw $t6, 0($t0)
+	addi $t0, $t0, 4
+	addi $t1, $t1, 4
+	j WINLOOP1
+WINLOOP2:
+	# Check Player input
+	li $t9, 0xffff0000
+	lw $t8, 0($t9)
+	li $t1, 1
+	bne $t8, $t1, WINLOOP2
+	
+	# z to select
+	li $t1, 122 # z key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, WIN_NO_Z # If z is pressed
+	jal ClearScreen
+	li $t3, 0
+	sw $t3, LEVEL
+	sw $t3, Character
+	j START
+WIN_NO_Z:
+	# P to restart
+	li $t1, 112 # p key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, WINLOOP2 # If p is pressed
+	jal ClearScreen
+	li $t3, 0
+	sw $t3, LEVEL
+	sw $t3, Character
+	j START
 
 # Draw lose screen
 Lose:
