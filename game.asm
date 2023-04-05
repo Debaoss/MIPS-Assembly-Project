@@ -511,7 +511,7 @@ CheckAllCollision:
 	
 	la $t5, Level_Coll
 	add $t5, $t2, $t5
-	la $a2, 0($t5) # platform data
+	lw $a2, 0($t5) # platform data
 	addi $sp, $sp, -4
 	sw $ra, 0($sp) # Store return value
 COLLLOOP:
@@ -519,14 +519,6 @@ COLLLOOP:
 	jal CheckCollision
 	addi $a1, $a1, 1
 	j COLLLOOP
-	
-	# Debug code
-	j COLLDONE2
-	
-	
-	
-	
-	
 	
 	# Check collision for boundaries of screen
 BOUNDARYCHECK:
@@ -536,13 +528,15 @@ BOUNDARYCHECK:
 	andi $t0, $a0, 1
 	andi $t7, $a0, 2
 	
-	move $t1, $a1
+	move $t1, $a1 # platform_no
 	li $t2, 4
 	mult $t1, $t2
-	mflo $t1
-	add $t1, $t1, $a0
+	mflo $t1 # 4 * platform_no
+	add $t1, $t1, $a0 # 4 * platform_no + side
 	mult $t1, $t2
-	mflo $t1 # t1 now points to the correct boundary
+	mflo $t1 # correct index
+	add $t2, $a2, $t1
+	lw $t1, 0($t2) # t1 now points to the correct boundary
 	
 	bnez $t7, UPDOWN2
 	la $t4, CH_Location
@@ -559,7 +553,7 @@ UPDOWN2:
 CHECKBOUND:
 	bnez $t0, BOUNDGREATER
 	sub $t1, $t1, $t5
-	ble $t3, $t1, COLLDONE2
+	blt $t3, $t1, COLLDONE2
 	subi $t1, $t1, 1
 	sw $t1, 0($t4)
 	
@@ -585,12 +579,12 @@ COLLDONE2:
 # Stored in a0: which side
 # Stored in a1: Which platform, in a2: level data address for this level
 CheckCollision:
-	move $t1, $a1
-	move $t0, $a0
+	move $t1, $a1 # Which platform
+	move $t0, $a0 # Which side
 	li $t2, 4
 	mult $t1, $t2
-	mflo $t1
-	add $t0, $t1, $t0
+	mflo $t1 # platform * 4
+	add $t0, $t1, $t0 # platform * 4 + side
 	mult $t0, $t2
 	mflo $t0 # Platform * 4 + side
 	mult $t1, $t2
@@ -652,7 +646,7 @@ UPDOWN:
 SIDECHECK:
 	bnez $t0, COLLGREATER
 	sub $t3, $t3, $t2
-	ble $t1, $t3, COLLDONE1
+	blt $t1, $t3, COLLDONE1
 	
 	addi $v0, $v0, 4
 	lw $t5, 0($v0) #other side of platform
