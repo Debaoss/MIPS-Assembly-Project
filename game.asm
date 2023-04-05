@@ -116,6 +116,8 @@ main:
 	addi $t4, $t4, 4
 	sw $t3, 0($t4)
 	
+	li $s0, -1
+	li $s1, -1
 START:
 	# Initialize menu
 	jal InitializeMenu
@@ -240,16 +242,14 @@ LEVELNOKEY:
 	sw $t3, Player_H_Speed # Slow horizontal movement
 
 LEVELKEYDONE:
-
 	# Check grounded, apply gravity, apply horizontal and vertical speed
 	lw $t3, Player_V_Speed
 	
 	beqz $t3, GRAVITY
 	li $t4, 1
 	sw $t4, Redraw
-	jal EraseCharacter
+	lw $s1, CH_Location + 4
 	
-	lw $t3, Player_V_Speed
 	la $t5, CH_Location
 	lw $t4, 4($t5) # player y coordinate
 	sra $t3, $t3, 3 # speed // 8
@@ -273,9 +273,8 @@ GRAVITY:
 	beqz $t3, NO_H_SPEED
 	li $t4, 1
 	sw $t4, Redraw
-	jal EraseCharacter
+	lw $s0, CH_Location
 	
-	lw $t3, Player_H_Speed
 	la $t5, CH_Location
 	lw $t4, 0($t5) # player x coordinate
 	sra $t3, $t3, 3 # speed // 8
@@ -305,6 +304,18 @@ NOT_RIGHT:
 NO_H_SPEED:
 	lw $t3, Redraw
 	beqz $t3, NO_REDRAW1
+	move $a0, $s0
+	move $a1, $s1
+	bgez $a0, REDRAW1
+	lw $a0, CH_Location
+REDRAW1:
+	bgez $a1, REDRAW2
+	lw $a1, CH_Location + 4
+REDRAW2:
+	li $s0, -1
+	li $s1, -1
+	jal EraseCharacter
+	
 	jal DrawCharacter
 	li $t3, 0
 	sw $t3, Redraw
@@ -483,7 +494,7 @@ CHJUMP1:
 CHDRAWN:
 	jr $ra
 	
-# Erase character from given location
+# Erase character from given location, stored in a0 and a1
 EraseCharacter:
 	li $t0, BASE_ADDRESS
 	lw $t1, LEVEL
@@ -496,11 +507,11 @@ EraseCharacter:
 	
 	# Get Ch location
 	la $t6, CH_Location
-	lw $t5, 0($t6)
-	lw $t7, 4($t6)
+	move $t5, $a0 # x coordinate
+	move $t7, $a1 # y coordinate
 	li $t6, 256
 	mult $t6, $t7
-	mflo $t7
+	mflo $t7 # y * 256
 	add $t7, $t7, $t5
 	li $t6, 4
 	mult $t6, $t7
@@ -620,10 +631,15 @@ CHECKBOUND:
 	sw $t1, 0($t4)
 	
 	# If vertical reset vertical speed, set airbourne to 0
-	beqz $t7, COLLDONE2
+	beqz $t7, HORIZONTAL1
 	li $t6, 0
 	sw $t6, Player_V_Speed
 	sw $t6, Airbourne
+	j COLLDONE2
+	
+HORIZONTAL1:
+	li $t6, 0
+	sw $t6, Player_H_Speed
 	
 	j COLLDONE2
 BOUNDGREATER:
@@ -632,9 +648,15 @@ BOUNDGREATER:
 	sw $t1, 0($t4)
 	
 	# If vertical, reset vertical speed
-	beqz $t7, COLLDONE2
+	beqz $t7, HORIZONTAL2
 	li $t6, 0
 	sw $t6, Player_V_Speed
+	j COLLDONE2
+
+HORIZONTAL2:
+	li $t6, 0
+	sw $t6, Player_H_Speed
+	
 COLLDONE2:
 	jr $ra
 
@@ -720,10 +742,15 @@ SIDECHECK:
 	# If vertical, reset vertical speed, set airbourne to 0
 	move $t4, $a0
 	andi $t4, $t4, 2
-	beqz $t4, COLLDONE1
+	beqz $t4, HORIZONTAL3
 	li $t6, 0
 	sw $t6, Player_V_Speed
 	sw $t6, Airbourne
+	j COLLDONE1
+	
+HORIZONTAL3:
+	li $t6, 0
+	sw $t6, Player_H_Speed
 	
 	j COLLDONE1
 COLLGREATER:
@@ -740,9 +767,14 @@ COLLGREATER:
 	# If vertical, reset vertical speed
 	move $t4, $a0
 	andi $t4, $t4, 2
-	beqz $t4, COLLDONE1
+	beqz $t4, HORIZONTAL4
 	li $t6, 0
 	sw $t6, Player_V_Speed
+	j COLLDONE1
+	
+HORIZONTAL4:
+	li $t6, 0
+	sw $t6, Player_H_Speed
 
 COLLDONE1:
 	jr $ra
@@ -771,3 +803,16 @@ CLEARLOOP:
 	j CLEARLOOP
 CLEARDONE:
 	jr $ra
+
+
+
+# Debug Code
+	li $v0, 1
+	move $a0, $s0
+	syscall
+	li $v0, 4
+	la $a0, debug_space
+	syscall
+	li $v0, 32
+	li $a0, 1000
+	syscall
