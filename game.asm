@@ -36,7 +36,7 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
-.eqv TOTAL_LEVELS 5
+.eqv TOTAL_LEVELS 1 # Change to 5 later
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 0
@@ -66,10 +66,12 @@ E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
+Player_H_Speed:	.word 0
 LEVEL:		.word 0
 Health:		.word 0
 Airbourne:	.word 0
 Character:	.word 0
+Redraw:		.word 0
 
 Level_Back:	.word 0:TOTAL_LEVELS
 Level_Coll:	.word 0:TOTAL_LEVELS
@@ -185,54 +187,39 @@ LEVELLOOP:
 	lw $t2, 4($t9) # Key pressed
 	bne $t1, $t2, LEVEL_NO_D # If d is pressed
 	
-	jal EraseCharacter
+	li $t3, 16
+	sw $t3, Player_H_Speed
 	
-	la $t3, CH_Location
-	lw $t4, 0($t3)
-	addi $t4, $t4, 4
-	sw $t4, 0($t3)
-	
-	lw $t3, Character
-	srl $t3, $t3, 1
-	sll $t3, $t3, 1
-	sw $t3, Character
-	# Check for collision
-	li $a0, 0
-	jal CheckAllCollision
-	
-	jal DrawCharacter
-	
-	j LEVELNOKEY
+	j LEVELKEYDONE
 LEVEL_NO_D:
 	li $t1, 97 # a key ascii code
 	lw $t2, 4($t9) # Key pressed
 	bne $t1, $t2, LEVEL_NO_A # If a is pressed
 	
-	jal EraseCharacter
+	li $t3, -16
+	sw $t3, Player_H_Speed
 	
-	la $t3, CH_Location
-	lw $t4, 0($t3)
-	addi $t4, $t4, -4
-	sw $t4, 0($t3)
-	
-	lw $t3, Character
-	srl $t3, $t3, 1
-	sll $t3, $t3, 1
-	addi $t3, $t3, 1
-	sw $t3, Character
-	# Check for collision
-	li $a0, 1
-	jal CheckAllCollision
-	
-	jal DrawCharacter
-	
-	j LEVELNOKEY
+	j LEVELKEYDONE
 LEVEL_NO_A:
+	li $t1, 119 # w key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LEVEL_NO_W # If w is pressed
 	
+	# Deny jump if airbourne already
+	lw $t3, Airbourne
+	bnez $t3, LEVELKEYDONE
 	
+	# Jump
+	li $t3, 1
+	sw $t3, Airbourne
+	li $t3, -25
+	sw $t3, Player_V_Speed
 	
+	j LEVELKEYDONE
+LEVEL_NO_W:
 	# Player shoot
 	
+LEVEL_NO_Z:
 	# P to restart
 	li $t1, 112 # p key ascii code
 	lw $t2, 4($t9) # Key pressed
@@ -244,16 +231,92 @@ LEVEL_NO_A:
 	j START
 	
 LEVELNOKEY:
+	lw $t3, Airbourne
+	bnez $t3, LEVELKEYDONE # If not airbourne
+	lw $t3, Player_H_Speed
+	li $t4, 2
+	div $t3, $t4
+	mflo $t3
+	sw $t3, Player_H_Speed # Slow horizontal movement
 
-	# Check grounded, apply gravity
+LEVELKEYDONE:
+
+	# Check grounded, apply gravity, apply horizontal and vertical speed
+	lw $t3, Player_V_Speed
+	
+	beqz $t3, GRAVITY
+	li $t4, 1
+	sw $t4, Redraw
+	jal EraseCharacter
+	
+	lw $t3, Player_V_Speed
+	la $t5, CH_Location
+	lw $t4, 4($t5) # player y coordinate
+	sra $t3, $t3, 3 # speed // 8
+	add $t4, $t4, $t3 # add speed to y
+	sw $t4, 4($t5) # store new y coordinate
+	bgez $t3, GRAVITY # no need to check upwards collision if falling
+	# Check for roof collision
+	li $a0, 3
+	jal CheckAllCollision
+GRAVITY:
+	lw $t3, Player_V_Speed
+	addi $t3, $t3, 1
+	sw $t3, Player_V_Speed # Update speed
+	# Check for collision
+	li $a0, 2
+	jal CheckAllCollision
+	
+	# Apply Horizontal Movement
+	lw $t3, Player_H_Speed
+	
+	beqz $t3, NO_H_SPEED
+	li $t4, 1
+	sw $t4, Redraw
+	jal EraseCharacter
+	
+	lw $t3, Player_H_Speed
+	la $t5, CH_Location
+	lw $t4, 0($t5) # player x coordinate
+	sra $t3, $t3, 3 # speed // 8
+	add $t4, $t4, $t3 # add speed to x
+	sw $t4, 0($t5) # store new x coordinate
+	bltz $t3, NOT_RIGHT # Check if player is going right
+	
+	# Make character face right
+	lw $t3, Character
+	srl $t3, $t3, 1
+	sll $t3, $t3, 1
+	sw $t3, Character
+	
+	li $a0, 0
+	jal CheckAllCollision
+	j NO_H_SPEED
+NOT_RIGHT:
+	# Make character face left
+	lw $t3, Character
+	srl $t3, $t3, 1
+	sll $t3, $t3, 1
+	addi $t3, $t3, 1
+	sw $t3, Character
+	
+	li $a0, 1
+	jal CheckAllCollision
+NO_H_SPEED:
+	lw $t3, Redraw
+	beqz $t3, NO_REDRAW1
+	jal DrawCharacter
+	li $t3, 0
+	sw $t3, Redraw
+NO_REDRAW1:
 	
 	# Enemies shoot
 	
-	# Move bullets
+	# Move enemy bullets
 	
-	# Check Collision
+	# Move player bullet
 	
-	
+	# Check win condition
 	
 	
 	
@@ -554,7 +617,6 @@ CHECKBOUND:
 	bnez $t0, BOUNDGREATER
 	sub $t1, $t1, $t5
 	blt $t3, $t1, COLLDONE2
-	subi $t1, $t1, 1
 	sw $t1, 0($t4)
 	
 	# If vertical reset vertical speed, set airbourne to 0
@@ -652,7 +714,6 @@ SIDECHECK:
 	lw $t5, 0($v0) #other side of platform
 	bgt $t1, $t5, COLLDONE1
 	
-	subi $t3, $t3, 1
 	add $t7, $t7, $t4
 	sw $t3, 0($t7)
 	
