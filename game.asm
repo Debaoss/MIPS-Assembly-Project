@@ -87,7 +87,8 @@ LevelECount:	.word 0:TOTAL_LEVELS
 Characters:	.word 0:4
 Enemies:	.word 0:2
 
-
+# For code reuse purposes
+Enemy_Loc:	.word 0:4
 
 
 debug_space:	.asciiz " "
@@ -514,7 +515,12 @@ LEVELDONE:
 	jal DrawDoor
 	
 	# Draw Enemies
+	jal DrawEnemies
 	
+	# Draw Hearts
+	li $t0, 3
+	sw $t0, Health
+	jal DrawHeart
 	
 	
 	lw $ra, 0($sp)
@@ -607,11 +613,101 @@ CHJUMP2:
 CHERASED:
 	jr $ra
 
-# Draw enemies at given locations
+# Draw all enemies
+DrawEnemies:
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelECount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of enemies (address)
+	lw $a3, 0($t4)
+	
+	la $t5, LevelEnemy
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # enemy data
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp) # Store return value
+	addi $sp, $sp, -8 # Two word spaces in stack
+	li $t6, 0
+	sw $t6, 0($sp) # Counter variable
+	sw $a2, 4($sp) # Enemy data (pointer)
+ENMDRAWLOOP:
+	lw $t0, 0($sp) # Get counter variable
+	bge $t0, $a3, ENMDRAWDONE # branch if counter >= no of enemies
+	lw $t0, 4($sp) # Get enemy data
+	lw $a0, 0($t0) # Enemy x
+	lw $a1, 4($t0) # Enemy y
+	lw $a2, 8($t0) # Enemy model
+	jal DrawEnemy # Draw enemy
+	# Increment counter
+	lw $t0, 0($sp)
+	addi $t0, $t0, 1
+	sw $t0, 0($sp)
+	# Increment enemy data pointer
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12
+	sw $t0, 4($sp)
+	j ENMDRAWLOOP
+ENMDRAWDONE:
+	addi $sp, $sp, 8
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+
+# Draw enemy at given location
+# a0: x coordinate, a1: y coordinate, a2: which model
 DrawEnemy:
+	li $t0, BASE_ADDRESS
+	la $t1, Enemies
+	li $t2, 4
+	mult $a2, $t2
+	mflo $t2
+	add $t1, $t1, $t2
+	lw $t1, 0($t1)
+	
+	li $t2, 0
+	li $t3, 42
+	
+	addi $t4, $t1, 4368
+	li $t5, 256
+	mult $t5, $a1
+	mflo $t5
+	add $t5, $t5, $a0
+	li $t6, 4
+	mult $t5, $t6
+	mflo $t5
+	add $t0, $t5, $t0
+ENEMYLOOP1:
+	beq $t1, $t4, ENEMYDRAWN
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, ENEMYJUMP1
+	li $t2, 0
+	addi $t0, $t0, 856 # Next line
+ENEMYJUMP1:
+	j ENEMYLOOP1
+ENEMYDRAWN:
+	jr $ra
+
+
+
+
+
+
+
+
+
 
 # Draws and clears hearts
 DrawHeart:
+	lw $t0, Health
+	jr $ra
 
 # Draws the door
 DrawDoor:
@@ -640,6 +736,55 @@ DOORDRAWN:
 # Checks collision with platforms
 # Stored in a0: 0 for left side, 1 for right, 2 for top, 3 for bottom
 CheckAllCollision:
+	# Check collision for all enemies
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelECount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of enemies (address)
+	lw $a3, 0($t4)
+	
+	la $t5, LevelEnemy
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # enemy data
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp) # Store return value
+	addi $sp, $sp, -8 # Two word spaces in stack
+	li $t6, 0
+	sw $t6, 0($sp) # Counter variable
+	sw $a2, 4($sp) # Enemy data (pointer)
+	li $a1, 0
+	la $a2, Enemy_Loc
+ENMCOLLLOOP:
+	lw $t0, 0($sp) # Get counter variable
+	bge $t0, $a3, ENMCOLLDONE # branch if counter >= no of enemies
+	lw $t0, 4($sp) # Get enemy data
+	lw $t1, 0($t0) # Enemy x
+	lw $t2, 4($t0) # Enemy y
+	sw $t1, 0($a2)
+	sw $t2, 8($a2)
+	addi $t1, $t1, ENM_WIDTH
+	addi $t1, $t1, -1
+	addi $t2, $t2, ENM_HEIGHT
+	addi $t2, $t2, -1
+	sw $t1, 4($a2)
+	sw $t2, 12($a2) # $a2 now stores enemy location data
+	jal CheckCollision # Check collision for that enemy
+	# Increment counter
+	lw $t0, 0($sp)
+	addi $t0, $t0, 1
+	sw $t0, 0($sp)
+	# Increment enemy data pointer
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12
+	sw $t0, 4($sp)
+ENMCOLLDONE:
+	addi $sp, $sp, 8 # Free the two spaces taken from stack
+
 	# Check collision for all platforms
 	li $a1, 0
 	lw $t0, LEVEL
@@ -648,14 +793,12 @@ CheckAllCollision:
 	mflo $t2 # level * 4
 	la $t5, LevelCollCount
 	add $t5, $t2, $t5
-	lw $t4, 0($t5) # number of platforms
+	lw $t4, 0($t5) # number of platforms (address)
 	lw $a3, 0($t4)
 	
 	la $t5, Level_Coll
 	add $t5, $t2, $t5
 	lw $a2, 0($t5) # platform data
-	addi $sp, $sp, -4
-	sw $ra, 0($sp) # Store return value
 COLLLOOP:
 	beq $a1, $a3, BOUNDARYCHECK # break loop
 	jal CheckCollision
@@ -664,7 +807,7 @@ COLLLOOP:
 	
 	# Check collision for boundaries of screen
 BOUNDARYCHECK:
-	lw $ra, 0($sp)
+	lw $ra, 0($sp) # Get return value
 	addi $sp, $sp, 4
 	
 	andi $t0, $a0, 1
