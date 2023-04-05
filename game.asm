@@ -171,7 +171,6 @@ MENUNOKEY:
 	syscall
 	j MENULOOP2
 MENULOOPEND:
-	
 	# Initialize Game
 	jal InitializeLevel
 	
@@ -209,12 +208,13 @@ LEVEL_NO_A:
 	
 	# Deny jump if airbourne already
 	lw $t3, Airbourne
-	bnez $t3, LEVELKEYDONE
+	li $t4, 4
+	bge $t3, $t4, LEVELKEYDONE
 	
 	# Jump
 	li $t3, 1
 	sw $t3, Airbourne
-	li $t3, -50
+	li $t3, -55
 	sw $t3, Player_V_Speed
 	
 	j LEVELKEYDONE
@@ -234,39 +234,30 @@ LEVEL_NO_Z:
 	
 LEVELNOKEY:
 	lw $t3, Airbourne
-	bnez $t3, LEVELKEYDONE # If not airbourne
+	bnez $t3, AIRBOURNE_DECAY # If not airbourne
 	lw $t3, Player_H_Speed
 	li $t4, 2
 	div $t3, $t4
 	mflo $t3
 	sw $t3, Player_H_Speed # Slow horizontal movement
-
-LEVELKEYDONE:
-	# Check grounded, apply gravity, apply horizontal and vertical speed
-	lw $t3, Player_V_Speed
-	
-	beqz $t3, GRAVITY
-	li $t4, 1
-	sw $t4, Redraw
-	lw $s1, CH_Location + 4
-	
-	la $t5, CH_Location
-	lw $t4, 4($t5) # player y coordinate
-	sra $t3, $t3, 3 # speed // 8
-	add $t4, $t4, $t3 # add speed to y
-	sw $t4, 4($t5) # store new y coordinate
-	bgez $t3, GRAVITY # no need to check upwards collision if falling
-	# Check for roof collision
-	li $a0, 3
-	jal CheckAllCollision
-GRAVITY:
-	lw $t3, Player_V_Speed
+	j LEVELKEYDONE
+AIRBOURNE_DECAY:
+	lw $t3, Player_H_Speed
+	bltz $t3, DECAYLEFT
+	addi $t3, $t3, -4
+	sw $t3, Player_H_Speed
+	bgez $t3, LEVELKEYDONE
+	li $t3, 0
+	sw $t3, Player_H_Speed
+	j LEVELKEYDONE
+DECAYLEFT:
 	addi $t3, $t3, 4
-	sw $t3, Player_V_Speed # Update speed
-	# Check for collision
-	li $a0, 2
-	jal CheckAllCollision
-	
+	sw $t3, Player_H_Speed
+	blez $t3, LEVELKEYDONE
+	li $t3, 0
+	sw $t3, Player_H_Speed
+LEVELKEYDONE:
+
 	# Apply Horizontal Movement
 	lw $t3, Player_H_Speed
 	
@@ -301,7 +292,42 @@ NOT_RIGHT:
 	
 	li $a0, 1
 	jal CheckAllCollision
+
+
 NO_H_SPEED:
+
+
+
+	# Check grounded, apply gravity, apply horizontal and vertical speed
+	lw $t3, Player_V_Speed
+	
+	beqz $t3, GRAVITY
+	li $t4, 1
+	sw $t4, Redraw
+	lw $s1, CH_Location + 4
+	
+	la $t5, CH_Location
+	lw $t4, 4($t5) # player y coordinate
+	sra $t3, $t3, 3 # speed // 8
+	add $t4, $t4, $t3 # add speed to y
+	sw $t4, 4($t5) # store new y coordinate
+	bgez $t3, GRAVITY # no need to check upwards collision if falling
+	# Check for roof collision
+	li $a0, 3
+	jal CheckAllCollision
+GRAVITY:
+	lw $t3, Player_V_Speed
+	addi $t3, $t3, 4
+	sw $t3, Player_V_Speed # Update speed
+	# Set airbourne, if collision airbourne will reset
+	lw $t3, Airbourne
+	addi $t3, $t3, 1
+	sw $t3, Airbourne
+	# Check for collision
+	li $a0, 2
+	jal CheckAllCollision
+	
+	
 	lw $t3, Redraw
 	beqz $t3, NO_REDRAW1
 	move $a0, $s0
@@ -448,11 +474,16 @@ LEVELDONE:
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
 	jal DrawCharacter
+	
+	# Draw door
 	jal DrawDoor
+	
+	# Draw Enemies
+	
+	
+	
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
-	
-	
 	jr $ra
 
 # Draw character at given location
@@ -665,121 +696,70 @@ COLLDONE2:
 # Stored in a0: which side
 # Stored in a1: Which platform, in a2: level data address for this level
 CheckCollision:
-	move $t1, $a1 # Which platform
-	move $t0, $a0 # Which side
-	li $t2, 4
-	mult $t1, $t2
-	mflo $t1 # platform * 4
-	add $t0, $t1, $t0 # platform * 4 + side
-	mult $t0, $t2
-	mflo $t0 # Platform * 4 + side
-	mult $t1, $t2
-	mflo $t1 # Platform * 4
-	
-	# words are size 4
-	mult $t0, $t2
-	mflo $t0
+	move $t1, $a1 # which platform
+	move $t0, $a0 # which side
+	li $t2, 16
 	mult $t1, $t2
 	mflo $t1
+	add $t1, $t1, $a2 # pointer to the platform in question
 	
-	move $t2, $a2
-	add $t2, $t2, $t0
-	lw $t3, 0($t2) # Relevent side of the platform
-	move $v0, $t2 # save for later
+	# Check left side
+	lw $t3, 0($t1) # left side x value
+	subi $t3, $t3, CH_WIDTH
+	lw $t4, CH_Location # x coordinate
+	ble $t4, $t3, COLLDONE1
+	# Check right side
+	lw $t3, 4($t1) # right side x value
+	bgt $t4, $t3, COLLDONE1
+	# Check top side
+	lw $t3, 8($t1) # top side y value
+	subi $t3, $t3, CH_HEIGHT
+	lw $t4, CH_Location + 4 # y coordinate
+	ble $t4, $t3, COLLDONE1
+	# Check bottom side
+	lw $t3, 12($t1) # bottom side y value
+	bgt $t4, $t3, COLLDONE1
 	
-	add $t1, $t1, $a2
-	
-	# left/right or up/down
-	move $t5, $a0
-	andi $t5, 2
-	bnez $t5, UPDOWN
-	
-	# Check if y value within platform
-	lw $t4, 8($t1)
-	lw $t5, 12($t1)
-	la $t7, CH_Location
-	lw $t6, 4($t7) # y coordinate of person
-	subi $t4, $t4, CH_HEIGHT
-	ble $t6, $t4, COLLDONE1
-	bgt $t6, $t5, COLLDONE1
-	
-	# Less than or greater than
-	move $t0, $a0
-	andi $t0, $t0, 1
-	lw $t1, 0($t7) # x coordinate of person
-	li $t2, CH_WIDTH
-	li $t4, 0
-	j SIDECHECK
+	# Move character
+	li $t2, 4
+	mult $t0, $t2
+	mflo $t0
+	add $t1, $t1, $t0 # points to the side in question
+	andi $t6, $a0, 2
+	bnez $t6, UPDOWN
+	la $t3, CH_Location 
+	li $t4, CH_WIDTH
+	la $t5, Player_H_Speed
+	j CHECK1
 UPDOWN:
-	# Check if x value within platform
-	lw $t4, 0($t1)
-	lw $t5, 4($t1)
-	la $t7, CH_Location
-	lw $t6, 0($t7) # x coordinate of person
-	subi $t4, $t4, CH_HEIGHT
-	ble $t6, $t4, COLLDONE1
-	bgt $t6, $t5, COLLDONE1
-	
-	# Less than or greater than
-	move $t0, $a0
-	andi $t0, $t0, 1
-	lw $t1, 4($t7) # y coordinate of person
-	li $t2, CH_HEIGHT
-	li $t4, 4
-	j SIDECHECK
-	
-	# Check the side
-SIDECHECK:
-	bnez $t0, COLLGREATER
-	sub $t3, $t3, $t2
-	blt $t1, $t3, COLLDONE1
-	
-	addi $v0, $v0, 4
-	lw $t5, 0($v0) #other side of platform
-	bgt $t1, $t5, COLLDONE1
-	
-	add $t7, $t7, $t4
-	sw $t3, 0($t7)
-	
-	# If vertical, reset vertical speed, set airbourne to 0
-	move $t4, $a0
-	andi $t4, $t4, 2
-	beqz $t4, HORIZONTAL3
+	la $t3, CH_Location + 4
+	li $t4, CH_HEIGHT
+	la $t5, Player_V_Speed
+CHECK1:
+	andi $t6, $a0, 1
+	bnez $t6, GREATERTHAN
 	li $t6, 0
-	sw $t6, Player_V_Speed
+	sw $t6, 0($t5) # set relevent speed to 0
+	lw $t6, 0($t1) # location of collision side
+	sub $t6, $t6, $t4 # offset by ch size
+	sw $t6, 0($t3) # set new ch location
+	# check airbourne
+	andi $t6, $a0, 2
+	beqz $t6, COLLDONE1
+	li $t6, 0
 	sw $t6, Airbourne
 	j COLLDONE1
-	
-HORIZONTAL3:
+GREATERTHAN:
 	li $t6, 0
-	sw $t6, Player_H_Speed
-	
-	j COLLDONE1
-COLLGREATER:
-	bgt $t1, $t3, COLLDONE1
-	addi $t3, $t3, 1
-	add $t7, $t7, $t4
-	sw $t3, 0($t7)
-	
-	addi $v0, $v0, -4
-	lw $t5, 0($v0) # other side of platform
-	sub $t5, $t5, $t2
-	ble $t1, $t5, COLLDONE1
-	
-	# If vertical, reset vertical speed
-	move $t4, $a0
-	andi $t4, $t4, 2
-	beqz $t4, HORIZONTAL4
-	li $t6, 0
-	sw $t6, Player_V_Speed
-	j COLLDONE1
-	
-HORIZONTAL4:
-	li $t6, 0
-	sw $t6, Player_H_Speed
-
+	sw $t6, 0($t5) # set relevent speed to 0
+	lw $t6, 0($t1) # location of collision side
+	addi $t6, $t6, 1 # offset by 1
+	sw $t6, 0($t3) # set new ch location
 COLLDONE1:
 	jr $ra
+
+
+
 
 # Checks friendly fire on enemies
 CheckFHit:
