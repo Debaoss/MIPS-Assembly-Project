@@ -39,8 +39,8 @@
 .eqv TOTAL_LEVELS 2 # Change to 5 later
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
-.eqv ENM_HEIGHT 0
-.eqv ENM_WIDTH 0
+.eqv ENM_HEIGHT 26
+.eqv ENM_WIDTH 42
 .eqv GOAL_HEIGHT 22
 .eqv GOAL_WIDTH 16
 .eqv DARK_BLUE 0x3f48cc
@@ -59,6 +59,8 @@
 .include "Level2Info.inc"
 .include "Ch_Right.inc"
 .include "Ch_Left.inc"
+.include "Enemy_Right.inc"
+.include "Enemy_Left.inc"
 .include "Door.inc"
 .include "WinScreen.inc"
 
@@ -83,6 +85,7 @@ LevelCollCount:	.word 0:TOTAL_LEVELS
 LevelEnemy:	.word 0:TOTAL_LEVELS
 LevelECount:	.word 0:TOTAL_LEVELS
 Characters:	.word 0:4
+Enemies:	.word 0:2
 
 
 
@@ -127,8 +130,14 @@ main:
 	la $t4, Characters
 	sw $t3, 0($t4)
 	la $t3, CH_Left
-	addi $t4, $t4, 4
+	sw $t3, 4($t4)
+	
+	la $t3, Enemy_Right
+	la $t4, Enemies
 	sw $t3, 0($t4)
+	la $t3, Enemy_Left
+	sw $t3, 4($t4)
+	
 	
 	li $s0, -1
 	li $s1, -1
