@@ -36,7 +36,7 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
-.eqv TOTAL_LEVELS 1 # Change to 5 later
+.eqv TOTAL_LEVELS 2 # Change to 5 later
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 0
@@ -54,7 +54,9 @@
 .include "menu.inc"
 .include "menuarrow.inc"
 .include "background1.inc"
+.include "background2.inc"
 .include "Level1Info.inc"
+.include "Level2Info.inc"
 .include "Ch_Right.inc"
 .include "Ch_Left.inc"
 .include "Door.inc"
@@ -94,22 +96,32 @@ main:
 	la $t3, background1
 	la $t4, Level_Back
 	sw $t3, 0($t4)
+	la $t3, background2
+	sw $t3, 4($t4)
 	
 	la $t3, Level1PlatColl
 	la $t4, Level_Coll
 	sw $t3, 0($t4)
+	la $t3, Level2PlatColl
+	sw $t3, 4($t4)
 	
 	la $t3, Level1PlatNo
 	la $t4, LevelCollCount
 	sw $t3, 0($t4)
+	la $t3, Level2PlatNo
+	sw $t3, 4($t4)
 	
 	la $t3, Level1EnemyNo
 	la $t4, LevelECount
 	sw $t3, 0($t4)
+	la $t3, Level2EnemyNo
+	sw $t3, 4($t4)
 	
 	la $t3, Level1Enemy
 	la $t4, LevelEnemy
 	sw $t3, 0($t4)
+	la $t3, Level2Enemy
+	sw $t3, 4($t4)
 	
 	la $t3, CH_Right
 	la $t4, Characters
@@ -364,6 +376,7 @@ NO_REDRAW1:
 	bgt $t3, $t4, NOT_WIN
 	lw $t5, LEVEL
 	addi $t5, $t5, 1
+	sw $t5, LEVEL
 	li $t6, TOTAL_LEVELS
 	beq $t5, $t6, Win
 	j MENULOOPEND
