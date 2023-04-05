@@ -48,6 +48,7 @@
 .eqv LIGHT_BLUE 0x7092be
 .eqv BLACK 0x000000
 .eqv FRAME 40
+.eqv COYOTE_TIME 4
 
 .include "bitmap_buffer.inc"
 .include "menu.inc"
@@ -206,9 +207,9 @@ LEVEL_NO_A:
 	lw $t2, 4($t9) # Key pressed
 	bne $t1, $t2, LEVEL_NO_W # If w is pressed
 	
-	# Deny jump if airbourne already
+	# Deny jump if airbourne already, with added coyote time
 	lw $t3, Airbourne
-	li $t4, 4
+	li $t4, COYOTE_TIME
 	bge $t3, $t4, LEVELKEYDONE
 	
 	# Jump
@@ -586,7 +587,7 @@ DrawDoor:
 	li $t3, 16
 	move $t4, $t1
 	addi $t4, $t4, 1408
-	addi $t0, $t0, 3008 #936
+	addi $t0, $t0, 11200 #3008 #936
 DOORLOOP1:
 	beq $t1, $t4, DOORDRAWN
 	lw $t5, 0($t1)
