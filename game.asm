@@ -189,7 +189,7 @@ LEVELLOOP:
 	lw $t2, 4($t9) # Key pressed
 	bne $t1, $t2, LEVEL_NO_D # If d is pressed
 	
-	li $t3, 16
+	li $t3, 32
 	sw $t3, Player_H_Speed
 	
 	j LEVELKEYDONE
@@ -198,7 +198,7 @@ LEVEL_NO_D:
 	lw $t2, 4($t9) # Key pressed
 	bne $t1, $t2, LEVEL_NO_A # If a is pressed
 	
-	li $t3, -16
+	li $t3, -32
 	sw $t3, Player_H_Speed
 	
 	j LEVELKEYDONE
@@ -214,7 +214,7 @@ LEVEL_NO_A:
 	# Jump
 	li $t3, 1
 	sw $t3, Airbourne
-	li $t3, -25
+	li $t3, -50
 	sw $t3, Player_V_Speed
 	
 	j LEVELKEYDONE
@@ -261,7 +261,7 @@ LEVELKEYDONE:
 	jal CheckAllCollision
 GRAVITY:
 	lw $t3, Player_V_Speed
-	addi $t3, $t3, 1
+	addi $t3, $t3, 4
 	sw $t3, Player_V_Speed # Update speed
 	# Check for collision
 	li $a0, 2
@@ -331,8 +331,10 @@ NO_REDRAW1:
 	
 	
 	
-	
-	
+	# Sleep
+	li $v0, 32
+	li $a0, FRAME
+	syscall
 	j LEVELLOOP
 	
 	
