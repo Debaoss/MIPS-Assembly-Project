@@ -66,10 +66,10 @@ E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
-LEVEL:		.byte 0
-Health:		.byte 0
-Airbourne:	.byte 0
-Character:	.byte 0
+LEVEL:		.word 0
+Health:		.word 0
+Airbourne:	.word 0
+Character:	.word 0
 
 Level_Back:	.word 0:TOTAL_LEVELS
 Level_Coll:	.word 0:TOTAL_LEVELS
@@ -197,6 +197,8 @@ LEVELLOOP:
 	sll $t3, $t3, 1
 	sw $t3, Character
 	# Check for collision
+	li $a0, 0
+	jal CheckAllCollision
 	
 	jal DrawCharacter
 	
@@ -219,6 +221,8 @@ LEVEL_NO_D:
 	addi $t3, $t3, 1
 	sw $t3, Character
 	# Check for collision
+	li $a0, 1
+	jal CheckAllCollision
 	
 	jal DrawCharacter
 	
@@ -248,6 +252,9 @@ LEVELNOKEY:
 	# Move bullets
 	
 	# Check Collision
+	
+	
+	
 	
 	
 	
@@ -489,30 +496,201 @@ DOORDRAWN:
 	jr $ra
 
 # Checks collision with platforms
-# Stored in a0: 0 for left side, 1 for right, 2 for top, 3 for down
+# Stored in a0: 0 for left side, 1 for right, 2 for top, 3 for bottom
 CheckAllCollision:
+	# Check collision for all platforms
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelCollCount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of platforms
+	lw $a3, 0($t4)
+	
+	la $t5, Level_Coll
+	add $t5, $t2, $t5
+	la $a2, 0($t5) # platform data
+	addi $sp, $sp, -4
+	sw $ra, 0($sp) # Store return value
+COLLLOOP:
+	beq $a1, $a3, BOUNDARYCHECK # break loop
+	jal CheckCollision
+	addi $a1, $a1, 1
+	j COLLLOOP
+	
+	# Debug code
+	j COLLDONE2
+	
+	
+	
+	
+	
+	
+	# Check collision for boundaries of screen
+BOUNDARYCHECK:
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	andi $t0, $a0, 1
+	andi $t7, $a0, 2
+	
+	move $t1, $a1
+	li $t2, 4
+	mult $t1, $t2
+	mflo $t1
+	add $t1, $t1, $a0
+	mult $t1, $t2
+	mflo $t1 # t1 now points to the correct boundary
+	
+	bnez $t7, UPDOWN2
+	la $t4, CH_Location
+	lw $t3, 0($t4) # t3 now points to x coordinate
+	li $t5, CH_WIDTH
+	j CHECKBOUND
+UPDOWN2:
+	la $t4, CH_Location
+	addi $t4, $t4, 4
+	lw $t3, 0($t4) # t3 now points to y coordinate
+	li $t5, CH_HEIGHT
+	j CHECKBOUND
+	
+CHECKBOUND:
+	bnez $t0, BOUNDGREATER
+	sub $t1, $t1, $t5
+	ble $t3, $t1, COLLDONE2
+	subi $t1, $t1, 1
+	sw $t1, 0($t4)
+	
+	# If vertical reset vertical speed, set airbourne to 0
+	beqz $t7, COLLDONE2
+	li $t6, 0
+	sw $t6, Player_V_Speed
+	sw $t6, Airbourne
+	
+	j COLLDONE2
+BOUNDGREATER:
+	bgt $t3, $t1, COLLDONE2
+	addi $t1, $t1, 1
+	sw $t1, 0($t4)
+	
+	# If vertical, reset vertical speed
+	beqz $t7, COLLDONE2
+	li $t6, 0
+	sw $t6, Player_V_Speed
+COLLDONE2:
+	jr $ra
 
+# Stored in a0: which side
 # Stored in a1: Which platform, in a2: level data address for this level
 CheckCollision:
-
-Level_Coll:	.word 0:TOTAL_LEVELS
-LevelCollCount:	.word 0:TOTAL_LEVELS
-
-	move $t0, $a1
-	move $t1, $a0
+	move $t1, $a1
+	move $t0, $a0
 	li $t2, 4
-	mult $t0, $t2
-	mflo $t0
+	mult $t1, $t2
+	mflo $t1
 	add $t0, $t1, $t0
 	mult $t0, $t2
+	mflo $t0 # Platform * 4 + side
+	mult $t1, $t2
+	mflo $t1 # Platform * 4
+	
+	# words are size 4
+	mult $t0, $t2
 	mflo $t0
+	mult $t1, $t2
+	mflo $t1
 	
 	move $t2, $a2
 	add $t2, $t2, $t0
 	lw $t3, 0($t2) # Relevent side of the platform
+	move $v0, $t2 # save for later
 	
+	add $t1, $t1, $a2
 	
+	# left/right or up/down
+	move $t5, $a0
+	andi $t5, 2
+	bnez $t5, UPDOWN
 	
+	# Check if y value within platform
+	lw $t4, 8($t1)
+	lw $t5, 12($t1)
+	la $t7, CH_Location
+	lw $t6, 4($t7) # y coordinate of person
+	subi $t4, $t4, CH_HEIGHT
+	ble $t6, $t4, COLLDONE1
+	bgt $t6, $t5, COLLDONE1
+	
+	# Less than or greater than
+	move $t0, $a0
+	andi $t0, $t0, 1
+	lw $t1, 0($t7) # x coordinate of person
+	li $t2, CH_WIDTH
+	li $t4, 0
+	j SIDECHECK
+UPDOWN:
+	# Check if x value within platform
+	lw $t4, 0($t1)
+	lw $t5, 4($t1)
+	la $t7, CH_Location
+	lw $t6, 0($t7) # x coordinate of person
+	subi $t4, $t4, CH_HEIGHT
+	ble $t6, $t4, COLLDONE1
+	bgt $t6, $t5, COLLDONE1
+	
+	# Less than or greater than
+	move $t0, $a0
+	andi $t0, $t0, 1
+	lw $t1, 4($t7) # y coordinate of person
+	li $t2, CH_HEIGHT
+	li $t4, 4
+	j SIDECHECK
+	
+	# Check the side
+SIDECHECK:
+	bnez $t0, COLLGREATER
+	sub $t3, $t3, $t2
+	ble $t1, $t3, COLLDONE1
+	
+	addi $v0, $v0, 4
+	lw $t5, 0($v0) #other side of platform
+	bgt $t1, $t5, COLLDONE1
+	
+	subi $t3, $t3, 1
+	add $t7, $t7, $t4
+	sw $t3, 0($t7)
+	
+	# If vertical, reset vertical speed, set airbourne to 0
+	move $t4, $a0
+	andi $t4, $t4, 2
+	beqz $t4, COLLDONE1
+	li $t6, 0
+	sw $t6, Player_V_Speed
+	sw $t6, Airbourne
+	
+	j COLLDONE1
+COLLGREATER:
+	bgt $t1, $t3, COLLDONE1
+	addi $t3, $t3, 1
+	add $t7, $t7, $t4
+	sw $t3, 0($t7)
+	
+	addi $v0, $v0, -4
+	lw $t5, 0($v0) # other side of platform
+	sub $t5, $t5, $t2
+	ble $t1, $t5, COLLDONE1
+	
+	# If vertical, reset vertical speed
+	move $t4, $a0
+	andi $t4, $t4, 2
+	beqz $t4, COLLDONE1
+	li $t6, 0
+	sw $t6, Player_V_Speed
+
+COLLDONE1:
+	jr $ra
 
 # Checks friendly fire on enemies
 CheckFHit:
