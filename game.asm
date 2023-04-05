@@ -235,7 +235,7 @@ LEVEL_NO_A:
 	bge $t3, $t4, LEVELKEYDONE
 	
 	# Jump
-	li $t3, 1
+	li $t3, 4
 	sw $t3, Airbourne
 	li $t3, -55
 	sw $t3, Player_V_Speed
