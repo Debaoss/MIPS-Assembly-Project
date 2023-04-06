@@ -62,6 +62,7 @@
 .include "Enemy_Right.asm"
 .include "Enemy_Left.asm"
 .include "Door.asm"
+.include "Heart.asm"
 .include "WinScreen.asm"
 
 .data
@@ -515,7 +516,7 @@ LEVELDONE:
 	# Draw Hearts
 	li $t0, 3
 	sw $t0, Health
-	jal DrawHeart
+	jal DrawHearts
 	
 	
 	lw $ra, 0($sp)
@@ -691,8 +692,111 @@ ENEMYDRAWN:
 	jr $ra
 
 # Draws and clears hearts
-DrawHeart:
+DrawHearts:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	li $a0, 106
+	li $a1, 208
+	jal EraseHeart
 	lw $t0, Health
+	li $t1, 3
+	blt $t0, $t1, TWOHP
+	li $a0, 106
+	li $a1, 208
+	jal DrawHeart
+TWOHP:
+	li $a0, 156
+	jal EraseHeart
+	lw $t0, Health
+	li $t1, 2
+	blt $t0, $t1, ONEHP
+	jal DrawHeart
+ONEHP:
+	li $a0, 206
+	jal EraseHeart
+	lw $t0, Health
+	blez $t0, ZEROHP
+	jal DrawHeart
+ZEROHP:
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+	
+# Draws a heart
+# a0 stores x coordinate, a1 stores y coordinate
+DrawHeart:
+	li $t0, BASE_ADDRESS
+	la $t1, Heart
+	
+	li $t2, 0
+	li $t3, 41
+	
+	addi $t4, $t1, 6232
+	li $t5, 256
+	mult $t5, $a1
+	mflo $t5
+	add $t5, $t5, $a0
+	li $t6, 4
+	mult $t5, $t6
+	mflo $t5
+	add $t0, $t5, $t0
+HEARTLOOP1:
+	beq $t1, $t4, HEARTDRAWN
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, HEARTJUMP1
+	li $t2, 0
+	addi $t0, $t0, 860 # Next line
+HEARTJUMP1:
+	j HEARTLOOP1
+HEARTDRAWN:
+	jr $ra
+
+# Erases a heart
+# a0 stores x coordinate, a1 stores y coordinate
+EraseHeart:
+	li $t0, BASE_ADDRESS
+	lw $t1, LEVEL
+	la $t2, Level_Back
+	sll $t1, $t1, 2 # times 4
+	add $t2, $t2, $t1
+	lw $t3, 0($t2)
+	move $t4, $t3
+	addi $t4, $t4, 38912
+	
+	move $t5, $a0 # x coordinate
+	move $t7, $a1 # y coordinate
+	li $t6, 256
+	mult $t6, $t7
+	mflo $t7 # y * 256
+	add $t7, $t7, $t5
+	li $t6, 4
+	mult $t6, $t7
+	mflo $t7
+	
+	add $t0, $t0, $t7 # add (y * 256 + x) * 4
+	add $t4, $t4, $t7
+	add $t3, $t3, $t7
+	li $t6, 0
+	li $t7, 41
+	
+HEARTLOOP2:
+	beq $t3, $t4, HEARTERASED
+	lw $t5, 0($t3)
+	sw $t5, 0($t0)
+	addi $t3, $t3, 4
+	addi $t0, $t0, 4
+	addi $t6, $t6, 1
+	bne $t6, $t7, HEARTJUMP2
+	li $t6, 0
+	addi $t0, $t0, 860 # Next line
+	addi $t3, $t3, 860
+HEARTJUMP2:
+	j HEARTLOOP2
+HEARTERASED:
 	jr $ra
 
 # Draws the door
