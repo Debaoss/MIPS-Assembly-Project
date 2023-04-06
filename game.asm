@@ -50,19 +50,19 @@
 .eqv FRAME 40
 .eqv COYOTE_TIME 4
 
-.include "bitmap_buffer.inc"
-.include "menu.inc"
-.include "menuarrow.inc"
-.include "background1.inc"
-.include "background2.inc"
-.include "Level1Info.inc"
-.include "Level2Info.inc"
-.include "Ch_Right.inc"
-.include "Ch_Left.inc"
-.include "Enemy_Right.inc"
-.include "Enemy_Left.inc"
-.include "Door.inc"
-.include "WinScreen.inc"
+.include "bitmap_buffer.asm"
+.include "menu.asm"
+.include "menuarrow.asm"
+.include "background1.asm"
+.include "background2.asm"
+.include "Level1Info.asm"
+.include "Level2Info.asm"
+.include "Ch_Right.asm"
+.include "Ch_Left.asm"
+.include "Enemy_Right.asm"
+.include "Enemy_Left.asm"
+.include "Door.asm"
+.include "WinScreen.asm"
 
 .data
 F_Bullet:	.word 0:3
@@ -316,12 +316,7 @@ NOT_RIGHT:
 	
 	li $a0, 1
 	jal CheckAllCollision
-
-
 NO_H_SPEED:
-
-
-
 	# Check grounded, apply gravity, apply horizontal and vertical speed
 	lw $t3, Player_V_Speed
 	
@@ -694,15 +689,6 @@ ENEMYJUMP1:
 	j ENEMYLOOP1
 ENEMYDRAWN:
 	jr $ra
-
-
-
-
-
-
-
-
-
 
 # Draws and clears hearts
 DrawHeart:
