@@ -14,20 +14,24 @@
 #
 # Which milestones have been reached in this submission?
 # (See the assignment handout for descriptions of the milestones)
-# - Milestone 1/2/3 (choose the one the applies)
+# - Milestone 3
 #
 # Which approved features have been implemented for milestone 3?
 # (See the assignment handout for the list of additional features)
-# 1. (fill in the feature, if any)
-# 2. (fill in the feature, if any)
-# 3. (fill in the feature, if any)
-# ... (add more if necessary)
+# 1. Health/Score [2 marks]
+# 2. Fail condition [1 mark]
+# 3. Win condition [1 mark]
+# 4. Different levels [2 marks]
+# 5. Shoot enemies [2 marks]
+# 6. Enemies shoot back! [2 marks]
+# 7. Start menu [1 mark]
+# 8. Gimmicks and features [?? marks]
 #
 # Link to video demonstration for final submission:
-# - (insert YouTube / MyMedia / other URL here). Make sure we can view it!
+# - https://youtu.be/54rC7-3FlYI
 #
 # Are you OK with us sharing the video with people outside course staff?
-# - yes / no / yes, and please share this project github link as well!
+# - yes, https://github.com/Debaoss/MIPS-Assembly-Project
 #
 # Any additional information that the TA needs to know:
 # - (write here, if any)
@@ -50,6 +54,7 @@
 .eqv LIGHT_BLUE 0x7092be
 .eqv BLACK 0x000000
 .eqv YELLOW 0xfff200
+.eqv SECRETNUMBER 12
 .eqv FRAME 40
 .eqv COYOTE_TIME 4
 .eqv E_SHOT_COOLDOWN 40
@@ -96,7 +101,7 @@ CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
 Player_H_Speed:	.word 0
-LEVEL:		.word 2 # Change to 0 later
+LEVEL:		.word 0
 Health:		.word 0
 Airbourne:	.word 0
 Character:	.word 0
@@ -115,6 +120,8 @@ Enemies:	.word 0:4
 # For code reuse purposes
 Enemy_Loc:	.word 0:4
 
+# Secret!
+Secret:		.word 0
 
 debug_space:	.asciiz " "
 
@@ -333,6 +340,11 @@ FSHOOTLEFT:
 FSHOOTCONTINUE:
 	sw $t0, F_Bullet + 4
 	li $t0, F_SHOT_COOLDOWN
+	lw $t1, Secret
+	li $t2, SECRETNUMBER
+	bne $t1, $t2, SECRET2
+	sll $t0, $t0, 2
+SECRET2:
 	sw $t0, F_Shot_Timer
 	jal DrawGunCharging
 	# Draw the bullet
@@ -471,16 +483,6 @@ NO_REDRAW1:
 	# Move enemy bullets
 	jal EnemyFireMove
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	# Move player bullet
 	lw $t1, F_Bullet
 	beqz $t1, FNOBULLET # check if shot exists
@@ -519,23 +521,6 @@ FMOVEBULLET:
 	li $a2, YELLOW
 	jal DrawBullet
 FNOBULLET:
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	# Update Gun Cooldown
 	lw $t0, F_Shot_Timer
@@ -595,11 +580,6 @@ NOT_WIN:
 	li $a0, FRAME
 	syscall
 	j LEVELLOOP
-	
-	
-	
-	
-	
 	
 END:
 	jal ClearScreen
@@ -693,6 +673,11 @@ LEVELLOOP1:
 	addi $t3, $t3, 4
 	j LEVELLOOP1
 LEVELDONE:
+	# Reset character velocity
+	li $t0, 0
+	sw $t0, Player_V_Speed
+	sw $t0, Player_H_Speed
+
 	# Set character at 0, 170
 	la $t6, CH_Location
 	li $t5, 0
@@ -716,6 +701,11 @@ LEVELDONE:
 	
 	# Draw Hearts
 	li $t0, 3
+	lw $t1, Secret
+	li $t2, SECRETNUMBER
+	bne $t1, $t2, SECRET1
+	li $t0, 1
+SECRET1:
 	sw $t0, Health
 	jal DrawHearts
 	
@@ -1925,6 +1915,13 @@ FHit:
 	add $t6, $t6, $t5
 	lw $t7, 0($t6)
 	addi $t7, $t7, STUN_DURATION
+	lw $t0, Secret
+	li $t1, SECRETNUMBER
+	bne $t0, $t1, SECRET3
+	addi $t7, $t7, STUN_DURATION
+	addi $t7, $t7, STUN_DURATION
+	addi $t7, $t7, STUN_DURATION
+SECRET3:
 	sw $t7, 0($t6)
 	
 	# Change enemy to stunned model
@@ -1993,6 +1990,8 @@ NOHIT1:
 
 # Draw win screen
 Win:
+	li $t0, 0
+	sw $t0, Secret
 	li $t0, BASE_ADDRESS # $t0 stores the base address for display
 	addi $t5, $t0, 262144
 	la $t1, WinScreen
@@ -2024,16 +2023,27 @@ WIN_NO_Z:
 	# P to restart
 	li $t1, 112 # p key ascii code
 	lw $t2, 4($t9) # Key pressed
-	bne $t1, $t2, WINLOOP2 # If p is pressed
+	bne $t1, $t2, WIN_NO_P # If p is pressed
 	jal ClearScreen
 	li $t3, 0
 	sw $t3, LEVEL
 	sw $t3, Character
 	sw $t3, Gun
 	j START
+WIN_NO_P:
+	# W for Secret
+	li $t1, 119 # w key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, WINLOOP2 # If w is pressed
+	lw $t0, Secret
+	addi $t0, $t0, 1
+	sw $t0, Secret
+	j WINLOOP2
 
 # Draw lose screen
 Lose:
+	li $t0, 0
+	sw $t0, Secret
 	li $t0, BASE_ADDRESS # $t0 stores the base address for display
 	addi $t5, $t0, 262144
 	la $t1, LoseScreen
