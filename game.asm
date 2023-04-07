@@ -36,7 +36,7 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
-.eqv TOTAL_LEVELS 2 # Change to 5 later
+.eqv TOTAL_LEVELS 3 # Change to 5 later
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 26
@@ -49,19 +49,23 @@
 .eqv RED 0xed1c24
 .eqv LIGHT_BLUE 0x7092be
 .eqv BLACK 0x000000
+.eqv YELLOW 0xfff200
 .eqv FRAME 40
 .eqv COYOTE_TIME 4
 .eqv E_SHOT_COOLDOWN 40
 .eqv F_SHOT_COOLDOWN 100
 .eqv BULLET_SPEED 12
+.eqv GUN_LEVEL 2
 
 .include "bitmap_buffer.asm"
 .include "menu.asm"
 .include "menuarrow.asm"
 .include "background1.asm"
 .include "background2.asm"
+.include "background3.asm"
 .include "Level1Info.asm"
 .include "Level2Info.asm"
+.include "Level3Info.asm"
 .include "Ch_Right.asm"
 .include "Ch_Left.asm"
 .include "Enemy_Right.asm"
@@ -80,12 +84,13 @@ CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
 Player_H_Speed:	.word 0
-LEVEL:		.word 1
+LEVEL:		.word 2 # Change to 0 later
 Health:		.word 0
 Airbourne:	.word 0
 Character:	.word 0
 Redraw:		.word 0
 Gun:		.word 0
+Gun_Location:	.word 110, 177
 
 Level_Back:	.word 0:TOTAL_LEVELS
 Level_Coll:	.word 0:TOTAL_LEVELS
@@ -110,30 +115,40 @@ main:
 	sw $t3, 0($t4)
 	la $t3, background2
 	sw $t3, 4($t4)
+	la $t3, background3
+	sw $t3, 8($t4)
 	
 	la $t3, Level1PlatColl
 	la $t4, Level_Coll
 	sw $t3, 0($t4)
 	la $t3, Level2PlatColl
 	sw $t3, 4($t4)
+	la $t3, Level3PlatColl
+	sw $t3, 8($t4)
 	
 	la $t3, Level1PlatNo
 	la $t4, LevelCollCount
 	sw $t3, 0($t4)
 	la $t3, Level2PlatNo
 	sw $t3, 4($t4)
+	la $t3, Level3PlatNo
+	sw $t3, 8($t4)
 	
 	la $t3, Level1EnemyNo
 	la $t4, LevelECount
 	sw $t3, 0($t4)
 	la $t3, Level2EnemyNo
 	sw $t3, 4($t4)
+	la $t3, Level3EnemyNo
+	sw $t3, 8($t4)
 	
 	la $t3, Level1Enemy
 	la $t4, LevelEnemy
 	sw $t3, 0($t4)
 	la $t3, Level2Enemy
 	sw $t3, 4($t4)
+	la $t3, Level3Enemy
+	sw $t3, 8($t4)
 	
 	la $t3, CH_Right
 	la $t4, Characters
@@ -1312,7 +1327,6 @@ EMOVEDONE:
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
 	jr $ra
-
 
 # Checks friendly fire collision
 CheckFHit:
