@@ -41,6 +41,8 @@
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 26
 .eqv ENM_WIDTH 42
+.eqv SHOT_HEIGHT 2
+.eqv SHOT_WIDTH 8
 .eqv GOAL_HEIGHT 22
 .eqv GOAL_WIDTH 16
 .eqv DARK_BLUE 0x3f48cc
@@ -49,6 +51,9 @@
 .eqv BLACK 0x000000
 .eqv FRAME 40
 .eqv COYOTE_TIME 4
+.eqv E_SHOT_COOLDOWN 40
+.eqv F_SHOT_COOLDOWN 100
+.eqv BULLET_SPEED 12
 
 .include "bitmap_buffer.asm"
 .include "menu.asm"
@@ -64,21 +69,23 @@
 .include "Door.asm"
 .include "Heart.asm"
 .include "WinScreen.asm"
+.include "LoseScreen.asm"
 
 .data
-F_Bullet:	.word 0:3
+F_Bullet:	.word 0:4
 F_Shot_Timer:	.word 0
-E_Bullet:	.word 0:24
+E_Bullet:	.word 0:32
 E_Shot_Timer:	.word 0:8
 CH_Location:	.word 0:2
 Goal_Location:	.word 0:2
 Player_V_Speed:	.word 0
 Player_H_Speed:	.word 0
-LEVEL:		.word 0
+LEVEL:		.word 1
 Health:		.word 0
 Airbourne:	.word 0
 Character:	.word 0
 Redraw:		.word 0
+Gun:		.word 0
 
 Level_Back:	.word 0:TOTAL_LEVELS
 Level_Coll:	.word 0:TOTAL_LEVELS
@@ -255,6 +262,7 @@ LEVEL_NO_Z:
 	li $t3, 0
 	sw $t3, LEVEL
 	sw $t3, Character
+	sw $t3, Gun
 	j START
 	
 LEVELNOKEY:
@@ -368,8 +376,10 @@ REDRAW2:
 NO_REDRAW1:
 	
 	# Enemies shoot
+	jal EnemyShoot
 	
 	# Move enemy bullets
+	jal EnemyFireMove
 	
 	# Move player bullet
 	
@@ -518,6 +528,35 @@ LEVELDONE:
 	sw $t0, Health
 	jal DrawHearts
 	
+	# Initialize Enemy shot timers
+	lw $t0, LEVEL
+	la $t1, LevelECount
+	sll $t0, $t0, 2 # times 4
+	add $t1, $t1, $t0
+	lw $t1, 0($t1)
+	lw $t1, 0($t1) # number of enemies
+	li $t2, 0
+	la $t3, E_Bullet
+	la $t4, E_Shot_Timer
+	li $t5, 0
+	# Also initialize friendly shot timer
+	sw $t5, F_Bullet
+	sw $t5, F_Shot_Timer
+	lw $t6, Gun
+	li $t7, 40
+	bnez $t6, SHOTINITLOOP
+	li $t7, 20000
+	sw $t7, F_Shot_Timer
+	li $t7, E_SHOT_COOLDOWN
+SHOTINITLOOP:
+	beq $t2, $t1, SHOTINITDONE
+	sw $t5, 0($t3)
+	sw $t7, 0($t4)
+	addi $t3, $t3, 16
+	addi $t4, $t4, 4
+	addi $t2, $t2, 1
+	j SHOTINITLOOP
+SHOTINITDONE:
 	
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
@@ -799,6 +838,83 @@ HEARTJUMP2:
 HEARTERASED:
 	jr $ra
 
+# Draws a bullet
+# a0 stores x coordinate, a1 stores y coordinate, a2 stores colour
+DrawBullet:
+	li $t0, BASE_ADDRESS
+	sll $t1, $a1, 8 # y times by 256
+	add $t1, $t1, $a0 # add x
+	sll $t1, $t1, 2 # times 4
+	add $t0, $t0, $t1 # add to t0
+	sw $a2, 0($t0)
+	sw $a2, 4($t0)
+	sw $a2, 8($t0)
+	sw $a2, 12($t0)
+	sw $a2, 16($t0)
+	sw $a2, 20($t0)
+	sw $a2, 24($t0)
+	sw $a2, 28($t0)
+	sw $a2, 1024($t0)
+	sw $a2, 1028($t0)
+	sw $a2, 1032($t0)
+	sw $a2, 1036($t0)
+	sw $a2, 1040($t0)
+	sw $a2, 1044($t0)
+	sw $a2, 1048($t0)
+	sw $a2, 1052($t0)
+	jr $ra
+
+# Erases a bullet
+# a0 stores x coordinate, a1 stores y coordinate
+EraseBullet:
+	li $t0, BASE_ADDRESS
+	lw $t1, LEVEL
+	la $t2, Level_Back
+	sll $t1, $t1, 2 # times 4
+	add $t2, $t2, $t1
+	lw $t1, 0($t2) # level background pointer
+	
+	sll $t2, $a1, 8 # y times by 256
+	add $t2, $t2, $a0 # add x
+	sll $t2, $t2, 2 # times 4
+	add $t0, $t0, $t2 # add to t0
+	add $t1, $t1, $t2 # add to t1
+	
+	# Erase
+	lw $t2, 0($t1)
+	sw $t2, 0($t0)
+	lw $t2, 4($t1)
+	sw $t2, 4($t0)
+	lw $t2, 8($t1)
+	sw $t2, 8($t0)
+	lw $t2, 12($t1)
+	sw $t2, 12($t0)
+	lw $t2, 16($t1)
+	sw $t2, 16($t0)
+	lw $t2, 20($t1)
+	sw $t2, 20($t0)
+	lw $t2, 24($t1)
+	sw $t2, 24($t0)
+	lw $t2, 28($t1)
+	sw $t2, 28($t0)
+	lw $t2, 1024($t1)
+	sw $t2, 1024($t0)
+	lw $t2, 1028($t1)
+	sw $t2, 1028($t0)
+	lw $t2, 1032($t1)
+	sw $t2, 1032($t0)
+	lw $t2, 1036($t1)
+	sw $t2, 1036($t0)
+	lw $t2, 1040($t1)
+	sw $t2, 1040($t0)
+	lw $t2, 1044($t1)
+	sw $t2, 1044($t0)
+	lw $t2, 1048($t1)
+	sw $t2, 1048($t0)
+	lw $t2, 1052($t1)
+	sw $t2, 1052($t0)
+	jr $ra
+	
 # Draws the door
 DrawDoor:
 	li $t0, BASE_ADDRESS
@@ -872,6 +988,7 @@ ENMCOLLLOOP:
 	lw $t0, 4($sp)
 	addi $t0, $t0, 12
 	sw $t0, 4($sp)
+	j ENMCOLLLOOP
 ENMCOLLDONE:
 	addi $sp, $sp, 8 # Free the two spaces taken from stack
 
@@ -1026,14 +1143,360 @@ GREATERTHAN:
 COLLDONE1:
 	jr $ra
 
+# Makes the enemies shoot, then decrements the timer
+EnemyShoot:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	addi $sp, $sp, -16 # get 4 spaces
+	lw $t0, LEVEL
+	sll $t0, $t0, 2
+	la $t1, LevelECount
+	add $t1, $t1, $t0
+	lw $t1, 0($t1)
+	lw $t1, 0($t1) # LevelECount (number)
+	sw $t1, 0($sp)
+	la $t2, LevelEnemy
+	add $t2, $t2, $t0
+	lw $t2, 0($t2) # LevelEnemy (pointer)
+	sw $t2, 4($sp)
+	la $t3, E_Shot_Timer # E_Shot_Timer (pointer)
+	sw $t3, 8($sp)
+	la $t4, E_Bullet # E_Bullet (pointer)
+	sw $t4, 12($sp)
+	li $a3, 0
+ESHOOTLOOP:
+	lw $t0, 0($sp) # LevelECount
+	beq $a3, $t0, ESHOOTDONE
+	lw $t1, 8($sp) # E_Shot_Timer
+	lw $t2, 0($t1)
+	bnez $t2, ENOSHOT
+	# reset shot timer
+	li $t2, E_SHOT_COOLDOWN
+	sw $t2, 0($t1)
+	
+	lw $t3, 12($sp) # E_Bullet
+	lw $t4, 4($sp) # Enemy that's shooting
+	li $t5, 1
+	sw $t5, 0($t3) # Shot now exists
+	lw $t5, 4($t4) # y coordinate of enemy
+	addi $t5, $t5, 5
+	sw $t5, 8($t3) # y coordinate of shot
+	lw $t5, 8($t4) # which way enemy is facing
+	sw $t5, 12($t3) # which way shot is facing
+	bnez $t5, ESHOOTLEFT
+	lw $t5, 0($t4) # x coordinate of enemy
+	addi $t5, $t5, 42
+	sw $t5, 4($t3) # x coordinate of shot
+	j ESHOOTCONTINUE
+ESHOOTLEFT:
+	lw $t5, 0($t4) # x coordinate of enemy
+	addi $t5, $t5, -8
+	sw $t5, 4($t3) # x coordinate of shot
+ESHOOTCONTINUE:
+	lw $a0, 4($t3)
+	lw $a1, 8($t3)
+	li $a2, RED
+	jal DrawBullet
+ENOSHOT:
+	addi $a3, $a3, 1 # increment counter
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12 # increment enemy pointer
+	sw $t0, 4($sp)
+	lw $t0, 8($sp)
+	# Decrement shot cooldown
+	lw $t1, 0($t0)
+	addi $t1, $t1, -1
+	sw $t1, 0($t0)
+	
+	addi $t0, $t0, 4 # increment shot timer pointer
+	sw $t0, 8($sp)
+	lw $t0, 12($sp)
+	addi $t0, $t0, 16 # increment bullet pointer
+	sw $t0, 12($sp)
+	j ESHOOTLOOP
+ESHOOTDONE:
+	# free stack space
+	addi $sp, $sp, 16
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+
+# Moves enemy bullets
+EnemyFireMove:
+	# Loop through each bullet
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	addi $sp, $sp, -20 # get 5 spaces
+	lw $t0, LEVEL
+	sll $t0, $t0, 2 # times 4
+	la $t1, LevelECount
+	add $t1, $t1, $t0
+	lw $t1, 0($t1)
+	lw $t1, 0($t1) # LevelECount (number)
+	sw $t1, 0($sp)
+	la $t2, LevelEnemy
+	add $t2, $t2, $t0
+	lw $t2, 0($t2) # LevelEnemy (pointer)
+	sw $t2, 4($sp)
+	la $t3, E_Shot_Timer # E_Shot_Timer (pointer)
+	sw $t3, 8($sp)
+	la $t4, E_Bullet # E_Bullet (pointer)
+	sw $t4, 12($sp)
+	li $t4, 0 # Counter
+	sw $t4, 16($sp)
+EBULLETLOOP:
+	lw $t0, 0($sp) # LevelECount
+	lw $t1, 16($sp) # Counter
+	beq $t1, $t0, EMOVEDONE
+
+	lw $t0, 12($sp) # bullet info
+	lw $t1, 0($t0)
+	beqz $t1, ENOBULLET # check if shot exists
+	
+	# Erase the bullet
+	lw $t0, 12($sp)
+	lw $a0, 4($t0)
+	lw $a1, 8($t0)
+	jal EraseBullet
+	
+	# Move the bullet
+	lw $t0, 12($sp)
+	lw $t1, 4($t0)
+	lw $t2, 12($t0)
+	bnez $t2, ELEFTBULLET
+	addi $t1, $t1, BULLET_SPEED
+	j EMOVEBULLET
+ELEFTBULLET:
+	subi $t1, $t1, BULLET_SPEED
+EMOVEBULLET:
+	sw $t1, 4($t0)
+	
+	# Check collision with Player
+	lw $a0, 12($sp) # bullet data
+	jal EHit
+	lw $t0, 12($sp)
+	lw $t1, 0($t0)
+	beqz $t1, ENOBULLET # if bullet gone, no need to check collision anymore
+	
+	# Check collision with other things
+	lw $a0, 12($sp) # bullet data
+	jal EShotColl
+	
+	# If bullet still exists, draw bullet
+	lw $t0, 12($sp)
+	lw $t1, 0($t0)
+	beqz $t1, ENOBULLET
+	lw $a0, 4($t0)
+	lw $a1, 8($t0)
+	jal DrawBullet
+	
+ENOBULLET:
+	# Increment data
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12 # increment enemy pointer
+	sw $t0, 4($sp)
+	lw $t0, 8($sp)
+	addi $t0, $t0, 4 # increment shot timer pointer
+	sw $t0, 8($sp)
+	lw $t0, 12($sp)
+	addi $t0, $t0, 16 # increment bullet pointer
+	sw $t0, 12($sp)
+	lw $t0, 16($sp)
+	addi $t0, $t0, 1 # increment counter
+	sw $t0, 16($sp)
+	
+	j EBULLETLOOP
+EMOVEDONE:
+	# free stack space
+	addi $sp, $sp, 20
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
 
 
-
-# Checks friendly fire on enemies
+# Checks friendly fire collision
 CheckFHit:
 
-# Checks enemy fire on player
+# Checks enemy fire collision
+# Stored in a0: bullet data
 CheckEHit:
+
+# Checks if shot collided with platforms/enemies/border
+# Stored in a0: bullet data
+EShotColl:
+	# Check collision for all enemies
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelECount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of enemies (address)
+	lw $a3, 0($t4)
+	
+	la $t5, LevelEnemy
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # enemy data
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp) # Store return value
+	addi $sp, $sp, -8 # Two word spaces in stack
+	li $t6, 0
+	sw $t6, 0($sp) # Counter variable
+	sw $a2, 4($sp) # Enemy data (pointer)
+	li $a1, 0
+	la $a2, Enemy_Loc
+ENMCOLLLOOP2:
+	lw $t0, 0($sp) # Get counter variable
+	bge $t0, $a3, ENMCOLLDONE2 # branch if counter >= no of enemies
+	lw $t0, 4($sp) # Get enemy data
+	lw $t1, 0($t0) # Enemy x
+	lw $t2, 4($t0) # Enemy y
+	sw $t1, 0($a2)
+	sw $t2, 8($a2)
+	addi $t1, $t1, ENM_WIDTH
+	addi $t1, $t1, -1
+	addi $t2, $t2, ENM_HEIGHT
+	addi $t2, $t2, -1
+	sw $t1, 4($a2)
+	sw $t2, 12($a2) # $a2 now stores enemy location data
+	jal ShotPlatformColl # Check collision for that enemy
+	# Increment counter
+	lw $t0, 0($sp)
+	addi $t0, $t0, 1
+	sw $t0, 0($sp)
+	# Increment enemy data pointer
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12
+	sw $t0, 4($sp)
+	
+	# If bullet no longer exists, break loop
+	lw $t0, 0($a0)
+	beqz $t0, ENMCOLLDONE2
+	j ENMCOLLLOOP2
+ENMCOLLDONE2:
+	addi $sp, $sp, 8 # Free the two spaces taken from stack
+
+	# Check collision for all platforms
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelCollCount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of platforms (address)
+	lw $a3, 0($t4)
+	
+	la $t5, Level_Coll
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # platform data
+COLLLOOP2:
+	beq $a1, $a3, BOUNDARYCHECK2 # break loop
+	jal ShotPlatformColl
+	addi $a1, $a1, 1
+	# If bullet no longer exists, break loop
+	lw $t0, 0($a0)
+	beqz $t0, BOUNDARYCHECK2
+	j COLLLOOP2
+	
+	# Check collision for boundaries of screen
+BOUNDARYCHECK2:
+
+	lw $ra, 0($sp) # Get return value
+	addi $sp, $sp, 4
+	
+	lw $t0, 4($a0) # x coordinate
+	li $t4, 248 # right border
+	bgt $t0, $t4, HIT1
+	bltz $t0, HIT1 # left border
+	
+	# Boundary has not been hit
+	jr $ra
+HIT1:
+	li $t0, 0
+	sw $t0, 0($a0) # delete bullet
+	jr $ra
+
+# Checks if shot collided with platform
+# Stored in a0: bullet data
+# Stored in a1: Which platform, in a2: level data address for this level
+ShotPlatformColl:
+	move $t1, $a1 # which platform
+	move $t0, $a0 # which side
+	li $t2, 16
+	mult $t1, $t2
+	mflo $t1
+	add $t1, $t1, $a2 # pointer to the platform in question
+	
+	# Check left side
+	lw $t3, 0($t1) # left side x value
+	subi $t3, $t3, SHOT_WIDTH
+	lw $t4, 4($a0) # x coordinate
+	ble $t4, $t3, COLLDONE3
+	# Check right side
+	lw $t3, 4($t1) # right side x value
+	bgt $t4, $t3, COLLDONE3
+	# Check top side
+	lw $t3, 8($t1) # top side y value
+	subi $t3, $t3, SHOT_HEIGHT
+	lw $t4, 8($a0) # y coordinate
+	ble $t4, $t3, COLLDONE3
+	# Check bottom side
+	lw $t3, 12($t1) # bottom side y value
+	bgt $t4, $t3, COLLDONE3
+	
+	# Delete bullet
+	li $t0, 0
+	sw $t0, 0($a0)
+COLLDONE3:
+
+	
+	jr $ra
+
+# Checks if friendly shot collided with enemy
+# Stored in a0: enemy data
+FHit:
+
+# Checks if enemy shot collided with friendly
+# Stored in a0: bullet data
+EHit:
+	lw $t0, 4($a0) # x coordinate
+	lw $t1, 8($a0) # y coordinate
+	lw $t2, CH_Location # x coordinate
+	lw $t3, CH_Location + 4 # y coordinate
+	subi $t4, $t2, SHOT_WIDTH
+	ble $t0, $t4, NOHIT1
+	addi $t4, $t2, CH_WIDTH
+	bge $t0, $t4, NOHIT1
+	subi $t4, $t3, SHOT_HEIGHT
+	ble $t1, $t4, NOHIT1
+	addi $t4, $t3, CH_HEIGHT
+	bge $t1, $t4, NOHIT1
+	
+	# Player has been hit
+	li $t0, 0
+	sw $t0, 0($a0) # delete bullet
+	lw $t0, Health
+	addi $t0, $t0, -1
+	sw $t0, Health # decrement health
+	
+	# redraw hearts
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	jal DrawHearts
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	# Check if health = 0
+	lw $t0, Health
+	bnez $t0, NOHIT1
+	# At 0 health
+	addi $sp, $sp, 20 # free stack space: 20 from EnemyFireMove, for which this is a helper function
+	j Lose
+NOHIT1:
+	jr $ra
 
 # Draw win screen
 Win:
@@ -1062,6 +1525,7 @@ WINLOOP2:
 	li $t3, 0
 	sw $t3, LEVEL
 	sw $t3, Character
+	sw $t3, Gun
 	j START
 WIN_NO_Z:
 	# P to restart
@@ -1072,10 +1536,49 @@ WIN_NO_Z:
 	li $t3, 0
 	sw $t3, LEVEL
 	sw $t3, Character
+	sw $t3, Gun
 	j START
 
 # Draw lose screen
 Lose:
+	li $t0, BASE_ADDRESS # $t0 stores the base address for display
+	addi $t5, $t0, 262144
+	la $t1, LoseScreen
+LOSELOOP1:
+	beq $t0, $t5, LOSELOOP2
+	lw $t6, 0($t1)
+	sw $t6, 0($t0)
+	addi $t0, $t0, 4
+	addi $t1, $t1, 4
+	j LOSELOOP1
+LOSELOOP2:
+	# Check Player input
+	li $t9, 0xffff0000
+	lw $t8, 0($t9)
+	li $t1, 1
+	bne $t8, $t1, LOSELOOP2
+	
+	# z to select
+	li $t1, 122 # z key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LOSE_NO_Z # If z is pressed
+	jal ClearScreen
+	li $t3, 0
+	sw $t3, LEVEL
+	sw $t3, Character
+	sw $t3, Gun
+	j START
+LOSE_NO_Z:
+	# P to restart
+	li $t1, 112 # p key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LOSELOOP2 # If p is pressed
+	jal ClearScreen
+	li $t3, 0
+	sw $t3, LEVEL
+	sw $t3, Character
+	sw $t3, Gun
+	j START
 
 # Clear Screen
 ClearScreen:
@@ -1093,6 +1596,7 @@ CLEARDONE:
 
 
 # Debug Code
+	move $v1, $a0
 	li $v0, 1
 	move $a0, $s0
 	syscall
@@ -1102,3 +1606,4 @@ CLEARDONE:
 	li $v0, 32
 	li $a0, 1000
 	syscall
+	move $a0, $v1
