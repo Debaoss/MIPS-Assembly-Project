@@ -68,10 +68,15 @@
 .include "Level3Info.asm"
 .include "Ch_Right.asm"
 .include "Ch_Left.asm"
+.include "Ch_Right_Gun.asm"
+.include "Ch_Left_Gun.asm"
 .include "Enemy_Right.asm"
 .include "Enemy_Left.asm"
+.include "GunReady.asm"
+.include "GunCharging.asm"
 .include "Door.asm"
 .include "Heart.asm"
+.include "GunSprite.asm"
 .include "WinScreen.asm"
 .include "LoseScreen.asm"
 
@@ -155,6 +160,10 @@ main:
 	sw $t3, 0($t4)
 	la $t3, CH_Left
 	sw $t3, 4($t4)
+	la $t3, Ch_Right_Gun
+	sw $t3, 8($t4)
+	la $t3, Ch_Left_Gun
+	sw $t3, 12($t4)
 	
 	la $t3, Enemy_Right
 	la $t4, Enemies
@@ -398,7 +407,37 @@ NO_REDRAW1:
 	
 	# Move player bullet
 	
+	# Update Gun Cooldown
+	
+	# Check Gun Pickup
+	lw $t0, LEVEL
+	li $t1, GUN_LEVEL
+	bne $t0, $t1, WINCON
+	lw $t0, Gun
+	bnez $t0, WINCON
+	lw $t0, CH_Location
+	lw $t1, CH_Location + 4
+	# Check if touching gun sprite
+	li $t2, 98
+	ble $t0, $t2, WINCON
+	li $t2, 122
+	bge $t0, $t2, WINCON
+	li $t2, 150
+	ble $t1, $t2, WINCON
+	# Gun Get!
+	li $t0, 1
+	sw $t0, Gun
+	li $t0, 0
+	sw $t0, F_Shot_Timer
+	lw $t0, Character
+	ori $t0, 2
+	sw $t0, Character
+	jal DrawGunReady
+	jal EraseGunSprite
+	jal DrawCharacter
+	
 	# Check win condition
+WINCON:
 	lw $t3, CH_Location
 	li $t4, 226
 	ble $t3, $t4, NOT_WIN
@@ -573,6 +612,19 @@ SHOTINITLOOP:
 	j SHOTINITLOOP
 SHOTINITDONE:
 	
+	# Setup gun pickup
+	lw $t0, LEVEL
+	li $t1, GUN_LEVEL
+	bne $t0, $t1, NOTGUNLEVEL
+	jal DrawGunSprite
+	
+NOTGUNLEVEL:
+	# Draw gun on toolbar
+	lw $t0, Gun
+	beqz $t0, INITNOGUN
+	jal DrawGunReady
+	
+INITNOGUN:
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
 	jr $ra
@@ -852,6 +904,80 @@ HEARTJUMP2:
 	j HEARTLOOP2
 HEARTERASED:
 	jr $ra
+	
+# Draws the gun sprite
+DrawGunSprite:
+	li $t0, BASE_ADDRESS
+	la $t1, GunSprite
+	
+	li $t2, 0
+	li $t3, 12
+	
+	addi $t4, $t1, 960
+	
+	lw $t5, Gun_Location + 4
+	sll $t5, $t5, 8 # multiply by 256
+	lw $t6, Gun_Location
+	add $t5, $t5, $t6
+	sll $t5, $t5, 2 # multiply by 4
+	add $t0, $t5, $t0
+GUNSPRITELOOP1:
+	beq $t1, $t4, GUNSPRITEDRAWN
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, GUNSPRITEJUMP1
+	li $t2, 0
+	addi $t0, $t0, 976 # Next line
+GUNSPRITEJUMP1:
+	j GUNSPRITELOOP1
+GUNSPRITEDRAWN:
+	jr $ra
+
+# Erases the gun sprite
+EraseGunSprite:
+	li $t0, BASE_ADDRESS
+	lw $t1, LEVEL
+	la $t2, Level_Back
+	sll $t1, $t1, 2 # times 4
+	add $t2, $t2, $t1
+	lw $t3, 0($t2)
+	move $t4, $t3
+	addi $t4, $t4, 20480
+	
+	lw $t5, Gun_Location # x coordinate
+	lw $t7, Gun_Location + 4 # y coordinate
+	li $t6, 256
+	mult $t6, $t7
+	mflo $t7 # y * 256
+	add $t7, $t7, $t5
+	li $t6, 4
+	mult $t6, $t7
+	mflo $t7
+	
+	add $t0, $t0, $t7 # add (y * 256 + x) * 4
+	add $t4, $t4, $t7
+	add $t3, $t3, $t7
+	li $t6, 0
+	li $t7, 12
+	
+GUNSPRITELOOP2:
+	beq $t3, $t4, GUNSPRITEERASED
+	lw $t5, 0($t3)
+	sw $t5, 0($t0)
+	addi $t3, $t3, 4
+	addi $t0, $t0, 4
+	addi $t6, $t6, 1
+	bne $t6, $t7, GUNSPRITEJUMP2
+	li $t6, 0
+	addi $t0, $t0, 976 # Next line
+	addi $t3, $t3, 976
+GUNSPRITEJUMP2:
+	j GUNSPRITELOOP2
+GUNSPRITEERASED:
+	jr $ra
 
 # Draws a bullet
 # a0 stores x coordinate, a1 stores y coordinate, a2 stores colour
@@ -952,6 +1078,54 @@ DOORLOOP1:
 DOORJUMP1:
 	j DOORLOOP1
 DOORDRAWN:
+	jr $ra
+
+# Draws ready gun in the toolbar
+DrawGunReady:
+	li $t0, BASE_ADDRESS
+	la $t1, GunReady
+	li $t2, 0
+	li $t3, 100
+	move $t4, $t1
+	addi $t4, $t4, 22400
+	addi $t0, $t0, 204800 #3008 #936
+DRAWGUNLOOP1:
+	beq $t1, $t4, GUNDRAWN1
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, DRAWGUNJUMP1
+	li $t2, 0
+	addi $t0, $t0, 624 # Next line
+DRAWGUNJUMP1:
+	j DRAWGUNLOOP1
+GUNDRAWN1:
+	jr $ra
+
+# Draw charging gun in the toolbar
+DrawGunCharging:
+	li $t0, BASE_ADDRESS
+	la $t1, GunCharging
+	li $t2, 0
+	li $t3, 100
+	move $t4, $t1
+	addi $t4, $t4, 22400
+	addi $t0, $t0, 204800 #3008 #936
+DRAWGUNLOOP2:
+	beq $t1, $t4, GUNDRAWN2
+	lw $t5, 0($t1)
+	sw $t5, 0($t0)
+	addi $t1, $t1, 4
+	addi $t0, $t0, 4
+	addi $t2, $t2, 1
+	bne $t2, $t3, DRAWGUNJUMP2
+	li $t2, 0
+	addi $t0, $t0, 624 # Next line
+DRAWGUNJUMP2:
+	j DRAWGUNLOOP2
+GUNDRAWN2:
 	jr $ra
 
 # Checks collision with platforms
