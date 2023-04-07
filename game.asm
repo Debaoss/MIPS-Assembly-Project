@@ -36,7 +36,7 @@
 
 
 .eqv BASE_ADDRESS 0x10008000
-.eqv TOTAL_LEVELS 3 # Change to 5 later
+.eqv TOTAL_LEVELS 4 # Change to 5 later
 .eqv CH_HEIGHT 27
 .eqv CH_WIDTH 12
 .eqv ENM_HEIGHT 26
@@ -64,9 +64,11 @@
 .include "background1.asm"
 .include "background2.asm"
 .include "background3.asm"
+.include "background4.asm"
 .include "Level1Info.asm"
 .include "Level2Info.asm"
 .include "Level3Info.asm"
+.include "Level4Info.asm"
 .include "Ch_Right.asm"
 .include "Ch_Left.asm"
 .include "Ch_Right_Gun.asm"
@@ -125,6 +127,8 @@ main:
 	sw $t3, 4($t4)
 	la $t3, background3
 	sw $t3, 8($t4)
+	la $t3, background4
+	sw $t3, 12($t4)
 	
 	la $t3, Level1PlatColl
 	la $t4, Level_Coll
@@ -133,6 +137,8 @@ main:
 	sw $t3, 4($t4)
 	la $t3, Level3PlatColl
 	sw $t3, 8($t4)
+	la $t3, Level4PlatColl
+	sw $t3, 12($t4)
 	
 	la $t3, Level1PlatNo
 	la $t4, LevelCollCount
@@ -141,6 +147,8 @@ main:
 	sw $t3, 4($t4)
 	la $t3, Level3PlatNo
 	sw $t3, 8($t4)
+	la $t3, Level4PlatNo
+	sw $t3, 12($t4)
 	
 	la $t3, Level1EnemyNo
 	la $t4, LevelECount
@@ -149,6 +157,8 @@ main:
 	sw $t3, 4($t4)
 	la $t3, Level3EnemyNo
 	sw $t3, 8($t4)
+	la $t3, Level4EnemyNo
+	sw $t3, 12($t4)
 	
 	la $t3, Level1Enemy
 	la $t4, LevelEnemy
@@ -157,6 +167,8 @@ main:
 	sw $t3, 4($t4)
 	la $t3, Level3Enemy
 	sw $t3, 8($t4)
+	la $t3, Level4Enemy
+	sw $t3, 12($t4)
 	
 	la $t3, CH_Right
 	la $t4, Characters
