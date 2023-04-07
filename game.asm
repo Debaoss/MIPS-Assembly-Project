@@ -55,6 +55,7 @@
 .eqv E_SHOT_COOLDOWN 40
 .eqv F_SHOT_COOLDOWN 100
 .eqv BULLET_SPEED 12
+.eqv STUN_DURATION 125
 .eqv GUN_LEVEL 2
 
 .include "bitmap_buffer.asm"
@@ -103,7 +104,7 @@ LevelCollCount:	.word 0:TOTAL_LEVELS
 LevelEnemy:	.word 0:TOTAL_LEVELS
 LevelECount:	.word 0:TOTAL_LEVELS
 Characters:	.word 0:4
-Enemies:	.word 0:2
+Enemies:	.word 0:4
 
 # For code reuse purposes
 Enemy_Loc:	.word 0:4
@@ -276,6 +277,41 @@ LEVEL_NO_A:
 	j LEVELKEYDONE
 LEVEL_NO_W:
 	# Player shoot
+	li $t1, 122 # z key ascii code
+	lw $t2, 4($t9) # Key pressed
+	bne $t1, $t2, LEVEL_NO_Z # If z is pressed
+	
+	# Deny shoot if on cooldown
+	lw $t3, F_Shot_Timer
+	bnez $t3, LEVELKEYDONE
+	
+	# Shoot
+	lw $t0, CH_Location
+	lw $t1, CH_Location + 4
+	addi $t1, $t1, 13
+	sw $t1, F_Bullet + 8
+	li $t1, 1
+	sw $t1, F_Bullet
+	lw $t1, Character
+	andi $t1, $t1, 1
+	sw $t1, F_Bullet + 12
+	bnez $t1, FSHOOTLEFT
+	addi $t0, $t0, CH_WIDTH
+	j FSHOOTCONTINUE
+FSHOOTLEFT:
+	subi $t0, $t0, SHOT_WIDTH
+FSHOOTCONTINUE:
+	sw $t0, F_Bullet + 4
+	li $t0, F_SHOT_COOLDOWN
+	sw $t0, F_Shot_Timer
+	jal DrawGunCharging
+	# Draw the bullet
+	lw $a0, F_Bullet + 4
+	lw $a1, F_Bullet + 8
+	li $a2, YELLOW
+	jal DrawBullet
+	
+	j LEVELKEYDONE
 	
 LEVEL_NO_Z:
 	# P to restart
@@ -405,10 +441,81 @@ NO_REDRAW1:
 	# Move enemy bullets
 	jal EnemyFireMove
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	# Move player bullet
+	lw $t1, F_Bullet
+	beqz $t1, FNOBULLET # check if shot exists
+	
+	# Erase the bullet
+	lw $a0, F_Bullet + 4
+	lw $a1, F_Bullet + 8
+	jal EraseBullet
+	
+	# Move the bullet
+	lw $t1, F_Bullet + 4
+	lw $t2, F_Bullet + 12
+	bnez $t2, FLEFTBULLET
+	addi $t1, $t1, BULLET_SPEED
+	j FMOVEBULLET
+FLEFTBULLET:
+	subi $t1, $t1, BULLET_SPEED
+FMOVEBULLET:
+	sw $t1, F_Bullet + 4
+	
+	# Check collision with Enemies
+	jal CheckFHit
+	lw $t0, 12($sp)
+	lw $t1, F_Bullet
+	beqz $t1, FNOBULLET # if bullet gone, no need to check collision anymore
+	
+	# Check collision with other things
+	la $a0, F_Bullet # bullet data
+	jal FShotColl
+	
+	# If bullet still exists, draw bullet
+	lw $t1, F_Bullet
+	beqz $t1, FNOBULLET
+	lw $a0, F_Bullet + 4
+	lw $a1, F_Bullet + 8
+	li $a2, YELLOW
+	jal DrawBullet
+FNOBULLET:
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	# Update Gun Cooldown
+	lw $t0, F_Shot_Timer
+	beqz $t0, CHECKPICKUP
+	addi $t0, $t0, -1
+	sw $t0, F_Shot_Timer
+	bnez $t0, CHECKPICKUP
+	jal DrawGunReady
 	
+CHECKPICKUP:
 	# Check Gun Pickup
 	lw $t0, LEVEL
 	li $t1, GUN_LEVEL
@@ -1477,6 +1584,7 @@ EMOVEBULLET:
 	beqz $t1, ENOBULLET
 	lw $a0, 4($t0)
 	lw $a1, 8($t0)
+	li $a2, RED
 	jal DrawBullet
 	
 ENOBULLET:
@@ -1502,12 +1610,66 @@ EMOVEDONE:
 	addi $sp, $sp, 4
 	jr $ra
 
-# Checks friendly fire collision
+# Checks friendly fire collision on enemies
 CheckFHit:
-
-# Checks enemy fire collision
-# Stored in a0: bullet data
-CheckEHit:
+	# Check collision for all enemies
+	la $a0, F_Bullet
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelECount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of enemies (address)
+	lw $a3, 0($t4)
+	
+	la $t5, LevelEnemy
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # enemy data
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp) # Store return value
+	addi $sp, $sp, -8 # Two word spaces in stack
+	li $t6, 0
+	sw $t6, 0($sp) # Counter variable
+	sw $a2, 4($sp) # Enemy data (pointer)
+	li $a1, 0
+	la $a2, Enemy_Loc
+ENMCOLLLOOP3:
+	lw $t0, 0($sp) # Get counter variable
+	bge $t0, $a3, ENMCOLLDONE3 # branch if counter >= no of enemies
+	move $a1, $t0
+	lw $t0, 4($sp) # Get enemy data
+	lw $t1, 0($t0) # Enemy x
+	lw $t2, 4($t0) # Enemy y
+	sw $t1, 0($a2)
+	sw $t2, 8($a2)
+	addi $t1, $t1, ENM_WIDTH
+	addi $t1, $t1, -1
+	addi $t2, $t2, ENM_HEIGHT
+	addi $t2, $t2, -1
+	sw $t1, 4($a2)
+	sw $t2, 12($a2) # $a2 now stores enemy location data
+	jal FHit # Check collision for that enemy
+	# Increment counter
+	lw $t0, 0($sp)
+	addi $t0, $t0, 1
+	sw $t0, 0($sp)
+	# Increment enemy data pointer
+	lw $t0, 4($sp)
+	addi $t0, $t0, 12
+	sw $t0, 4($sp)
+	
+	# If bullet no longer exists, break loop
+	lw $t0, F_Bullet
+	beqz $t0, ENMCOLLDONE3
+	j ENMCOLLLOOP3
+ENMCOLLDONE3:
+	addi $sp, $sp, 8 # Free the two spaces taken from stack
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
 
 # Checks if shot collided with platforms/enemies/border
 # Stored in a0: bullet data
@@ -1607,6 +1769,53 @@ HIT1:
 	sw $t0, 0($a0) # delete bullet
 	jr $ra
 
+# Checks if shot collided with platforms/border
+# Stored in a0: bullet data
+FShotColl:
+	# Check collision for all platforms
+	li $a1, 0
+	lw $t0, LEVEL
+	li $t1, 4
+	mult $t0, $t1
+	mflo $t2 # level * 4
+	la $t5, LevelCollCount
+	add $t5, $t2, $t5
+	lw $t4, 0($t5) # number of platforms (address)
+	lw $a3, 0($t4)
+	
+	la $t5, Level_Coll
+	add $t5, $t2, $t5
+	lw $a2, 0($t5) # platform data
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+COLLLOOP8:
+	beq $a1, $a3, BOUNDARYCHECK8 # break loop
+	jal ShotPlatformColl
+	addi $a1, $a1, 1
+	# If bullet no longer exists, break loop
+	lw $t0, 0($a0)
+	beqz $t0, BOUNDARYCHECK8
+	j COLLLOOP8
+	
+	# Check collision for boundaries of screen
+BOUNDARYCHECK8:
+
+	lw $ra, 0($sp) # Get return value
+	addi $sp, $sp, 4
+	
+	lw $t0, 4($a0) # x coordinate
+	li $t4, 248 # right border
+	bgt $t0, $t4, HIT2
+	bltz $t0, HIT2 # left border
+	
+	# Boundary has not been hit
+	jr $ra
+HIT2:
+	li $t0, 0
+	sw $t0, 0($a0) # delete bullet
+	jr $ra
+	
 # Checks if shot collided with platform
 # Stored in a0: bullet data
 # Stored in a1: Which platform, in a2: level data address for this level
@@ -1639,13 +1848,45 @@ ShotPlatformColl:
 	li $t0, 0
 	sw $t0, 0($a0)
 COLLDONE3:
-
-	
 	jr $ra
 
 # Checks if friendly shot collided with enemy
-# Stored in a0: enemy data
+# Stored in a0: bullet data
+# Stored in a1: which enemy, in a2: enemy data
 FHit:
+	move $t0, $a0 # which side
+	move $t1, $a2 # pointer to the platform in question
+	
+	# Check left side
+	lw $t3, 0($t1) # left side x value
+	subi $t3, $t3, SHOT_WIDTH
+	lw $t4, 4($a0) # x coordinate
+	ble $t4, $t3, COLLDONE6
+	# Check right side
+	lw $t3, 4($t1) # right side x value
+	bgt $t4, $t3, COLLDONE6
+	# Check top side
+	lw $t3, 8($t1) # top side y value
+	subi $t3, $t3, SHOT_HEIGHT
+	lw $t4, 8($a0) # y coordinate
+	ble $t4, $t3, COLLDONE6
+	# Check bottom side
+	lw $t3, 12($t1) # bottom side y value
+	bgt $t4, $t3, COLLDONE6
+	
+	# Delete bullet
+	li $t0, 0
+	sw $t0, 0($a0)
+	
+	# Stun the enemy
+	la $t6, E_Shot_Timer
+	sll $t5, $a1, 2
+	add $t6, $t6, $t5
+	lw $t7, 0($t6)
+	addi $t7, $t7, STUN_DURATION
+	sw $t7, 0($t6)
+COLLDONE6:
+	jr $ra
 
 # Checks if enemy shot collided with friendly
 # Stored in a0: bullet data
