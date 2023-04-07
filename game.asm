@@ -73,6 +73,8 @@
 .include "Ch_Left_Gun.asm"
 .include "Enemy_Right.asm"
 .include "Enemy_Left.asm"
+.include "Enemy_Right_Stunned.asm"
+.include "Enemy_Left_Stunned.asm"
 .include "GunReady.asm"
 .include "GunCharging.asm"
 .include "Door.asm"
@@ -171,6 +173,10 @@ main:
 	sw $t3, 0($t4)
 	la $t3, Enemy_Left
 	sw $t3, 4($t4)
+	la $t3, Enemy_Right_Stunned
+	sw $t3, 8($t4)
+	la $t3, Enemy_Left_Stunned
+	sw $t3, 12($t4)
 	
 	
 	li $s0, -1
@@ -1477,7 +1483,8 @@ ESHOOTLOOP:
 	lw $t5, 4($t4) # y coordinate of enemy
 	addi $t5, $t5, 5
 	sw $t5, 8($t3) # y coordinate of shot
-	lw $t5, 8($t4) # which way enemy is facing
+	lw $t6, 8($t4) # which way enemy is facing
+	andi $t5, $t6, 1
 	sw $t5, 12($t3) # which way shot is facing
 	bnez $t5, ESHOOTLEFT
 	lw $t5, 0($t4) # x coordinate of enemy
@@ -1489,6 +1496,16 @@ ESHOOTLEFT:
 	addi $t5, $t5, -8
 	sw $t5, 4($t3) # x coordinate of shot
 ESHOOTCONTINUE:
+	lw $t5, 12($t3)
+	beq $t5, $t6, NOUNSTUN
+	# Set enemy to normal model
+	sw $t5, 8($t4)
+	lw $a0, 0($t4)
+	lw $a1, 4($t4)
+	lw $a2, 8($t4)
+	jal DrawEnemy
+NOUNSTUN:
+	lw $t3, 12($sp)
 	lw $a0, 4($t3)
 	lw $a1, 8($t3)
 	li $a2, RED
@@ -1885,6 +1902,29 @@ FHit:
 	lw $t7, 0($t6)
 	addi $t7, $t7, STUN_DURATION
 	sw $t7, 0($t6)
+	
+	# Change enemy to stunned model
+	lw $t0, LEVEL
+	sll $t0, $t0, 2
+	la $t1, LevelEnemy
+	add $t1, $t1, $t0
+	lw $t2, 0($t1)
+	move $t3, $a1
+	li $t4, 12
+	mult $t3, $t4
+	mflo $t3
+	add $t2, $t2, $t3 # is now at the correct enemy
+	lw $t3, 8($t2) # get orientation of enemy
+	ori $t3, $t3, 2
+	sw $t3, 8($t2) # change to stunned model
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	lw $a0, 0($t2)
+	lw $a1, 4($t2)
+	lw $a2, 8($t2)
+	jal DrawEnemy
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
 COLLDONE6:
 	jr $ra
 
